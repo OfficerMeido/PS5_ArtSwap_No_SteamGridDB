@@ -2,6 +2,9 @@
 # Art Swap (PS5) - native Arch Linux build, replacing the Lima VM in ps5/tools/vm.sh
 #
 #   ./build-arch.sh                 # first run: packages + ps5/tools/bootstrap.sh, then build the title
+#   ./build-arch.sh --no-pacman     # do the setup but skip the pacman install (no sudo needed)
+#   ./build-arch.sh --clean         # delete this fork's build output (build/ps5, build/helper, dist/) and stop
+#   ./build-arch.sh --rebuild       # clean, then build from scratch (combine with --skip-setup to skip setup)
 #   ./build-arch.sh --skip-setup    # just build (stack already bootstrapped)
 #   ./build-arch.sh --rebuild-radv  # bootstrap and rebuild the RADV archive
 #   ./build-arch.sh TOOL [args]     # run any other ps5/tools/TOOL.sh (like vm.sh does)
@@ -13,12 +16,15 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 STACK="${STACK:-$HOME/ps5}"          # same layout the README uses in the VM
 GH="https://github.com/mihawk-99"
 
-SKIP_SETUP=0; REBUILD_RADV=0; TOOL=build
+SKIP_SETUP=0; REBUILD_RADV=0; NO_PACMAN=0; CLEAN=0; REBUILD=0; TOOL=build
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-setup)   SKIP_SETUP=1; shift ;;
+    --no-pacman)    NO_PACMAN=1; shift ;;
+    --clean)        CLEAN=1; shift ;;
+    --rebuild)      CLEAN=1; REBUILD=1; shift ;;
     --rebuild-radv) REBUILD_RADV=1; shift ;;
-    -h|--help)      sed -n '2,8p' "$0"; exit 0 ;;
+    -h|--help)      sed -n '2,12p' "$0"; exit 0 ;;
     *)              TOOL="$1"; shift; break ;;
   esac
 done
@@ -27,6 +33,21 @@ log() { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 [[ -f "$ROOT/ps5/tools/bootstrap.sh" ]] || die "ps5/tools/bootstrap.sh not found: run this from the root of your fork."
 
+# Remove this fork's build output only. The toolchain in ~/ps5 (SDK, RADV, native tool) is kept,
+# since it takes hours to rebuild; use --rebuild-radv if you want that redone.
+do_clean() {
+  log "Cleaning build output in $ROOT"
+  [[ -d "$ROOT/build/ps5" ]] && find "$ROOT/build/ps5/" -mindepth 1 -delete   # via the symlink
+  rm -f  "$ROOT/build/ps5.configure.log"
+  rm -rf "$ROOT/build/helper" "$ROOT/dist"
+  make -C "$ROOT/helper" clean >/dev/null 2>&1 || true
+  echo "Clean."
+}
+if [[ $CLEAN -eq 1 ]]; then
+  do_clean
+  [[ $REBUILD -eq 1 ]] || exit 0
+fi
+
 # Same variables vm.sh exports
 export PS5_VULKAN_DIR="$STACK/PS5_Vulkan"
 export PS5_PAYLOAD_SDK_FORK="$STACK/PS5_PayloadSDK"
@@ -34,13 +55,17 @@ export PS5_MESA_DIR="$STACK/PS5_Mesa"
 export PS5_VKHOMEBREWUI="$STACK/PS5_VulkanTemplate/.deps/PS5_VKHomebrewUI.git"
 
 if [[ $SKIP_SETUP -eq 0 ]]; then
-  log "Installing packages (sudo)"
-  sudo pacman -S --needed --noconfirm \
-    base-devel git cmake ninja make pkgconf curl bash \
-    python python-pip python-mako python-yaml python-pillow python-ply python-packaging \
-    meson clang lld llvm \
-    glslang shaderc spirv-tools spirv-headers spirv-llvm-translator libclc vulkan-headers \
-    bison flex zlib zstd expat libdrm libelf
+  if [[ $NO_PACMAN -eq 1 ]]; then
+    log "Skipping pacman (--no-pacman): make sure the packages are installed"
+  else
+    log "Installing packages (sudo)"
+    sudo pacman -S --needed --noconfirm \
+      base-devel git cmake ninja make pkgconf curl bash \
+      python python-pip python-mako python-yaml python-pillow python-ply python-packaging \
+      meson clang lld llvm \
+      glslang shaderc spirv-tools spirv-headers spirv-llvm-translator libclc vulkan-headers \
+      bison flex zlib zstd expat libdrm libelf
+  fi
 
   mkdir -p "$STACK/PS5_VulkanTemplate/.deps"
   if [[ ! -d "$PS5_VKHOMEBREWUI" ]]; then
