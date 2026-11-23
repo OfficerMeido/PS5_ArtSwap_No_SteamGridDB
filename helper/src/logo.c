@@ -152,7 +152,7 @@ bool logo_set(const app_t *app, const char *url, buf_t *report, char *err, size_
     buf_t data = {0}, png = {0};
     image_t img = {0};
     art_format_t fmt;
-    bool ok = sgdb_fetch(url, &data, err, errlen) && image_decode(data.data, data.len, &img, err, errlen) &&
+    bool ok = net_fetch(url, &data, err, errlen) && image_decode(data.data, data.len, &img, err, errlen) &&
               image_probe(data.data, data.len, &fmt);
     if (ok && fmt.container == CONTAINER_PNG && img.w <= LOGO_MAX_W && img.h <= LOGO_MAX_H) {
         png = data; /* as it is */

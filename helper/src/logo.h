@@ -8,7 +8,7 @@
 
 #include "scan.h"
 
-/* The picture at url (SteamGridDB's, or PlayStation Store's) as the logo on the title's page, at once.
+/* The picture at url (the person's own, or PlayStation Store's) as the logo on the title's page, at once.
  * Text: W lines, as APPLY's. Called with g_apply_lock held. */
 bool logo_set(const app_t *app, const char *url, buf_t *report, char *err, size_t errlen);
 /* Art Swap's logo taken away, and what the page had before put back (most often nothing).

@@ -198,7 +198,7 @@ bool art_add_background(const app_t *app, const char *folder, const char *url, c
     }
     buf_t download = {0}, dds = {0};
     image_t src = {0}, made = {0};
-    bool ok = sgdb_fetch(url, &download, err, errlen) && image_decode(download.data, download.len, &src, err, errlen);
+    bool ok = net_fetch(url, &download, err, errlen) && image_decode(download.data, download.len, &src, err, errlen);
     buf_free(&download);
     /* the home screen registers a background only as pic0.dds (a pic0.png alone is left out): 3840x2160 BC7,
      * as the console writes its own */
@@ -246,7 +246,7 @@ bool art_apply(const app_t *app, const char *slot, const char *url, const char *
         return false;
     }
     buf_t download = {0};
-    if (!sgdb_fetch(url, &download, err, errlen)) {
+    if (!net_fetch(url, &download, err, errlen)) {
         buf_free(&download);
         return false;
     }

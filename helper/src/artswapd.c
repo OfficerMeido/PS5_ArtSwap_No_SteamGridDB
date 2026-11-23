@@ -92,16 +92,6 @@ static bool reply_error(int fd, const char *message)
     return send_all(fd, line, strlen(line));
 }
 
-/* "key user 1bb9" or "key none" */
-static void key_line(buf_t *text)
-{
-    char hint[8];
-    if (config_key_hint(hint, sizeof(hint)))
-        buf_printf(text, "key\tuser\t%s\n", hint);
-    else
-        buf_printf(text, "key\tnone\n");
-}
-
 /* ---- the titles ---- */
 
 static void rescan(void)
@@ -154,8 +144,8 @@ static void set_logo_shown(const char *id, bool shown)
     pthread_mutex_unlock(&g_apps_lock);
 }
 
-/* After APPLY, RESTORE or RENAME: which files now have an original kept, the match, the name */
-static void refresh_app(const char *id, long game, const char *game_name, const char *name)
+/* After APPLY, RESTORE or RENAME: which files now have an original kept, the name */
+static void refresh_app(const char *id, const char *name)
 {
     pthread_mutex_lock(&g_apps_lock);
     for (int i = 0; i < g_count; i++) {
@@ -166,10 +156,6 @@ static void refresh_app(const char *id, long game, const char *game_name, const 
             char old[420], real[512];
             snprintf(old, sizeof(old), "%s.old", app->files[j].path);
             app->files[j].has_old = file_exists(cpath(old, real, sizeof(real)));
-        }
-        if (game >= 0) {
-            app->sgdb_id = game;
-            copy_str(app->sgdb_name, sizeof(app->sgdb_name), game_name);
         }
         if (name != NULL)
             copy_str(app->name, sizeof(app->name), name);
@@ -213,8 +199,7 @@ static void list_apps(buf_t *out)
         describe_slot(out, app, "icon");
         buf_printf(out, "\t");
         describe_slot(out, app, "pic");
-        buf_printf(out, "\t%d\t%ld\t", kept, app->sgdb_id);
-        buf_field(out, app->sgdb_name);
+        buf_printf(out, "\t%d", kept);
         bool refresh = false;
         for (int j = 0; j < nfolders && !refresh; j++)
             refresh = strcmp(folders[j], app->id) == 0;
@@ -257,7 +242,6 @@ static bool handle(int fd, char **field, int n)
         if (phone_lan_address(lan, sizeof(lan))[0])
             buf_printf(&text, "lan\t%s\n", lan);
         buf_printf(&text, "artswapd\t%s\n", ARTSWAP_VERSION);
-        key_line(&text);
         buf_printf(&text, "store\t%s\n", config_store_logos() ? "on" : "off");
         buf_printf(&text, "http\t%s\t", g_http_ok ? http_backend() : "unavailable");
         buf_field(&text, g_http_ok ? "" : g_http_error);
@@ -282,24 +266,9 @@ static bool handle(int fd, char **field, int n)
         else
             ok = reply_image(fd, &img);
         image_free(&img);
-    } else if (strcmp(cmd, "KEY") == 0) {
-        const char *key = n > 1 ? field[1] : "";
-        if (key[0] && !sgdb_check_key(key, err, sizeof(err)))
-            ok = reply_error(fd, err);
-        else if (!config_set_key(key))
-            ok = reply_error(fd, "that does not look like an API key");
-        else {
-            key_line(&text);
-            ok = reply_text(fd, &text);
-        }
-    } else if (strcmp(cmd, "KEYSTATE") == 0) {
-        key_line(&text);
-        ok = reply_text(fd, &text);
     } else if (strcmp(cmd, "PHONE") == 0) {
-        /* PHONE code [music|pictures]: open the phone page for that code; PHONE alone closes it */
-        const phone_mode_t mode = n > 2 && strcmp(field[2], "music") == 0      ? PHONE_MUSIC
-                                  : n > 2 && strcmp(field[2], "pictures") == 0 ? PHONE_PICTURES
-                                                                               : PHONE_KEY;
+        /* PHONE code music|pictures: open the phone page for that code; PHONE alone closes it */
+        const phone_mode_t mode = n > 2 && strcmp(field[2], "music") == 0 ? PHONE_MUSIC : PHONE_PICTURES;
         if (n < 2 || field[1][0] == 0) {
             phone_stop();
             ok = reply_text(fd, &text);
@@ -310,27 +279,6 @@ static bool handle(int fd, char **field, int n)
             buf_printf(&text, "lan\t%s\nport\t%d\n", phone_lan_address(lan, sizeof(lan)), phone_port());
             ok = reply_text(fd, &text);
         }
-    } else if (strcmp(cmd, "SEARCH") == 0) {
-        if (!want(fd, n, 2))
-            return true;
-        ok = sgdb_search(field[1], &text, err, sizeof(err)) ? reply_text(fd, &text) : reply_error(fd, err);
-    } else if (strcmp(cmd, "MATCH") == 0) {
-        if (!want(fd, n, 3))
-            return true;
-        const long game = strtol(field[2], NULL, 10);
-        const char *name = n > 3 ? field[3] : "";
-        if (!matches_set(field[1], game, name))
-            ok = reply_error(fd, "the choice could not be saved");
-        else {
-            refresh_app(field[1], game, name, NULL);
-            ok = reply_text(fd, &text);
-        }
-    } else if (strcmp(cmd, "LIST") == 0) {
-        if (!want(fd, n, 3))
-            return true;
-        ok = sgdb_list(strtol(field[1], NULL, 10), field[2], n > 3 ? atoi(field[3]) : 0, &text, err, sizeof(err))
-                 ? reply_text(fd, &text)
-                 : reply_error(fd, err);
     } else if (strcmp(cmd, "THUMB") == 0 || strcmp(cmd, "PREVIEW") == 0) {
         /* THUMB url w h: the picture scaled down to fit
          * PREVIEW url slot mode panx pany w h [zoom]: what APPLY would make, at w x h */
@@ -339,7 +287,7 @@ static bool handle(int fd, char **field, int n)
             return true;
         buf_t data = {0};
         image_t src = {0}, img = {0};
-        bool made = sgdb_fetch(field[1], &data, err, sizeof(err)) &&
+        bool made = net_fetch(field[1], &data, err, sizeof(err)) &&
                     image_decode(data.data, data.len, &src, err, sizeof(err));
         buf_free(&data);
         if (made && !preview)
@@ -389,7 +337,7 @@ static bool handle(int fd, char **field, int n)
             if (add && done)
                 rescan(); /* the new file */
             else
-                refresh_app(app.id, -1, "", NULL);
+                refresh_app(app.id, NULL);
             if (done && add)
                 home_note_name(app.id); /* shown once the game is installed again */
             else if (done)
@@ -434,7 +382,7 @@ static bool handle(int fd, char **field, int n)
                 done = false;
             }
             pthread_mutex_unlock(&g_apply_lock);
-            refresh_app(app.id, -1, "", NULL);
+            refresh_app(app.id, NULL);
             if (logo)
                 set_logo_shown(app.id, false);
             if (name || added || added_music)
@@ -462,7 +410,7 @@ static bool handle(int fd, char **field, int n)
             const bool done = name_change(&app, field[2], &text, err, sizeof(err));
             pthread_mutex_unlock(&g_apply_lock);
             if (done) {
-                refresh_app(app.id, -1, "", field[2]);
+                refresh_app(app.id, field[2]);
                 home_note_name(app.id);
             }
             ok = done ? reply_text(fd, &text) : reply_error(fd, err);
@@ -750,12 +698,11 @@ int main(void)
     mkdirs(data_path("cache", folder, sizeof(folder)));
     log_open();
     log_line("artswapd %s starting, pid %d", ARTSWAP_VERSION, (int)getpid());
-    config_load();
     /* download data a refresh moved aside, if the last helper ended before it was put back */
     smp_recover();
     g_http_ok = http_init(g_http_error, sizeof(g_http_error));
-    log_line("network: %s %s, key: %s", g_http_ok ? "ready" : "unavailable", g_http_error, config_key_source());
-    sgdb_cache_trim();
+    log_line("network: %s %s", g_http_ok ? "ready" : "unavailable", g_http_error);
+    net_cache_trim();
 
     int port = ARTSWAP_PORT;
 #ifdef ARTSWAP_HOST

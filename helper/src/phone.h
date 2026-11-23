@@ -1,6 +1,5 @@
 /*
- * Art Swap helper - the phone page, for adding a SteamGridDB key, or sending music or pictures from a phone or a
- * computer (phone.c).
+ * Art Swap helper - the phone page, for sending music or pictures from a phone or a computer (phone.c).
  *
  * Copyright (C) 2026 Gary Riches
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -11,7 +10,6 @@
 
 /* What the page is for */
 typedef enum {
-    PHONE_KEY,      /* the SteamGridDB key */
     PHONE_MUSIC,    /* music files, to /data/artswap/music */
     PHONE_PICTURES, /* pictures, to /data/artswap/pictures */
 } phone_mode_t;

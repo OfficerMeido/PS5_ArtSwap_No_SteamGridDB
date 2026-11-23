@@ -6,7 +6,7 @@
  * 0x8095F00C (sceHttpsGetSslError: 0x8095F00A, detail 0x20, "not a known
  * CA"), because a payload does not get the console's list of trusted roots.
  * A certificate callback (sceHttpsSetSslCallback) sees that one failure and
- * may accept it; SteamGridDB's API and its CDN then answer. So the callback
+ * may accept it; the server then answers. So the callback
  * here accepts the "unknown CA" result and nothing else: the library still
  * checks the name and the dates, and any other failure is refused.
  * sceHttpsDisableOption crashed the process outright, and HTTP/2 failed the

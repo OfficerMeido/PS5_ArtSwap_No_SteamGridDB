@@ -3,7 +3,7 @@
  *
  * The helper is a payload: it runs outside any title's sandbox, so it can read
  * and write the home screen's art (/user/appmeta) and the homebrew folders,
- * and it talks to SteamGridDB. The Art Swap title starts it through the ELF
+ * and it fetches Store logos. The Art Swap title starts it through the ELF
  * loader and asks it for everything over a localhost socket (protocol.md).
  *
  * The same source builds for macOS and Linux (ARTSWAP_HOST) with libcurl, the
@@ -90,14 +90,7 @@ bool http_get(const char *url, const char *bearer, buf_t *out, int *status, char
  * public catalog, which needs no account */
 bool http_get_plain(const char *url, buf_t *out, int *status, char *err, size_t errlen);
 
-/* ---- configuration: the API key ---- */
-void config_load(void);
-/* The person's own key (/data/artswap/apikey.txt); false when they have not given one */
-bool config_key(char *out, size_t size);
-const char *config_key_source(void); /* "user" or "none" */
-/* The key's last four characters, to tell one key from another on screen */
-bool config_key_hint(char *out, size_t size);
-bool config_set_key(const char *key);
+/* ---- configuration ---- */
 /* The title's own choices (/data/artswap/prefs.txt, "key<TAB>value" lines): a key of letters and digits, a
  * value of up to 63 printable characters */
 bool config_pref(const char *key, char *value, size_t size);
@@ -106,12 +99,8 @@ bool config_set_pref(const char *key, const char *value);
 bool config_store_logos(void);
 bool config_set_store_logos(bool on);
 
-/* ---- SteamGridDB (sgdb.c) ---- */
-/* Each writes TSV lines into out (protocol.md) */
-bool sgdb_search(const char *term, buf_t *out, char *err, size_t errlen);
-bool sgdb_list(long game, const char *kind, int page, buf_t *out, char *err, size_t errlen);
-bool sgdb_check_key(const char *key, char *err, size_t errlen);
-/* A picture from SteamGridDB's servers (or, with PlayStation Store logos on, Sony's image server), through the
- * download cache, or, named mine:<name>, one of the person's own (pictures.c) */
-bool sgdb_fetch(const char *url, buf_t *out, char *err, size_t errlen);
-void sgdb_cache_trim(void);
+/* ---- Pictures (fetch.c) ---- */
+/* A picture through the download cache: a PlayStation Store logo, when those are on (store.c), or, named
+ * mine:<name>, one of the person's own (pictures.c) */
+bool net_fetch(const char *url, buf_t *out, char *err, size_t errlen);
+void net_cache_trim(void);

@@ -558,7 +558,6 @@ bool scan_apps(app_t **apps_out, int *count_out)
         clean_name(apps[i].name);
         clean_name(apps[i].home_name);
     }
-    matches_apply(apps, count);
     if (count > 1)
         qsort(apps, (size_t)count, sizeof(app_t), by_name);
     write_report(apps, count);
@@ -566,57 +565,4 @@ bool scan_apps(app_t **apps_out, int *count_out)
     *apps_out = apps;
     *count_out = count;
     return true;
-}
-
-/* ---- the SteamGridDB game each title was matched with ---- */
-
-void matches_apply(app_t *apps, int count)
-{
-    char path[512];
-    buf_t text = {0};
-    if (!file_read(data_path("matches.tsv", path, sizeof(path)), &text) || text.len == 0) {
-        buf_free(&text);
-        return;
-    }
-    char *save = NULL;
-    for (char *line = strtok_r((char *)text.data, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
-        char *id = line, *game = strchr(id, '\t');
-        if (game == NULL)
-            continue;
-        *game++ = 0;
-        char *name = strchr(game, '\t');
-        if (name)
-            *name++ = 0;
-        for (int i = 0; i < count; i++)
-            if (strcmp(apps[i].id, id) == 0) {
-                apps[i].sgdb_id = strtol(game, NULL, 10);
-                copy_str(apps[i].sgdb_name, sizeof(apps[i].sgdb_name), name ? name : "");
-            }
-    }
-    buf_free(&text);
-}
-
-bool matches_set(const char *id, long game, const char *name)
-{
-    char path[512];
-    data_path("matches.tsv", path, sizeof(path));
-    buf_t text = {0}, out = {0};
-    file_read(path, &text);
-    char *save = NULL;
-    if (text.len > 0)
-        for (char *line = strtok_r((char *)text.data, "\n", &save); line; line = strtok_r(NULL, "\n", &save)) {
-            const size_t id_len = strlen(id);
-            if (strncmp(line, id, id_len) == 0 && line[id_len] == '\t')
-                continue; /* replaced below */
-            buf_printf(&out, "%s\n", line);
-        }
-    if (game > 0) {
-        buf_printf(&out, "%s\t%ld\t", id, game);
-        buf_field(&out, name);
-        buf_printf(&out, "\n");
-    }
-    const bool ok = file_write_replace(path, out.data ? out.data : (uint8_t *)"", out.len, NULL);
-    buf_free(&text);
-    buf_free(&out);
-    return ok;
 }

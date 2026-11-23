@@ -17,7 +17,7 @@ bool art_current(const app_t *app, const char *slot, int max_w, int max_h, image
  * "fit" shows it whole over a blurred fill. */
 bool art_compose(const image_t *src, const char *slot, const char *mode, float pan_x, float pan_y, float zoom, int w,
                  int h, image_t *out);
-/* The SteamGridDB picture at url into every file of the slot, made by
+/* The picture at url into every file of the slot, made by
  * art_compose. report gets "O" lines for originals kept and "W" lines for
  * files written. */
 bool art_apply(const app_t *app, const char *slot, const char *url, const char *mode, float pan_x, float pan_y,

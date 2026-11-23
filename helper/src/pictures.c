@@ -3,9 +3,9 @@
  *
  * Pictures the person sends from a phone or a computer (phone.c), or copies
  * to /data/artswap/pictures, are offered first in the picker, for an icon, a
- * background or a logo. The title names one as mine:<name>, which sgdb_fetch
+ * background or a logo. The title names one as mine:<name>, which net_fetch
  * reads from the folder (never through the download cache), so THUMB,
- * PREVIEW, APPLY and LOGO take them as they take SteamGridDB's.
+ * PREVIEW, APPLY and LOGO take them by name.
  *
  * The list reads only each file's head: a PNG's IHDR (and whether a tRNS
  * chunk comes before its pictures), a JPEG's frame header.

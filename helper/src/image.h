@@ -1,5 +1,5 @@
 /*
- * Art Swap helper - pictures: reading the console's art and SteamGridDB's,
+ * Art Swap helper - pictures: reading the console's art and the person's own,
  * scaling, framing, and writing in the form the file being replaced has.
  *
  * Copyright (C) 2026 Gary Riches

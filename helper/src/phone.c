@@ -1,23 +1,17 @@
 /*
- * Art Swap helper - the phone page: a SteamGridDB key, music or pictures, sent from a phone.
+ * Art Swap helper - the phone page: music or pictures, sent from a phone or a computer.
  *
- * Typing a 32-character key on the console's keyboard is slow, so the title
- * offers a page instead: while its "From your phone" sheet is open (PHONE
- * <code>), the helper serves one small page on port 9118 of the console's
- * network address. The page asks for the key, and the four-digit code the TV
- * shows (the QR code carries it). A key with the right code is checked with
- * SteamGridDB, then kept as the person's own (config_set_key). Nothing listens
- * on 9118 at any other time; the page closes after ten minutes, when the
- * sheet closes, or after ten wrong codes.
+ * Typing files over to the console is slow, so the title offers a page instead: while its "From your phone"
+ * sheet is open (PHONE <code> music|pictures), the helper serves one small page on port 9118 of the console's
+ * network address, with the four-digit code the TV shows (the QR code carries it). Nothing listens on 9118 at
+ * any other time; the page closes after ten minutes, when the sheet closes, or after ten wrong codes.
  *
- * Opened for music (PHONE <code> music), the page instead sends the files
- * chosen on the phone, one PUT each, into /data/artswap/music (music.c), where
- * the title lists them. The code goes with each. Opened for pictures (PHONE
- * <code> pictures), it sends pictures the same way into
- * /data/artswap/pictures (pictures.c), for the picker: PNG and JPEG as they
- * are, and anything else the phone's browser can draw (WebP, HEIC, GIF)
- * turned into a PNG on the phone first. A file that arrives and is not a PNG
- * or a JPEG is deleted. A computer's browser opens the same page.
+ * Opened for music (PHONE <code> music), the page sends the files chosen on the phone, one PUT each, into
+ * /data/artswap/music (music.c), where the title lists them. The code goes with each. Opened for pictures
+ * (PHONE <code> pictures), it sends pictures the same way into /data/artswap/pictures (pictures.c), for the
+ * picker: PNG and JPEG as they are, and anything else the phone's browser can draw (WebP, HEIC, GIF) turned
+ * into a PNG on the phone first. A file that arrives and is not a PNG or a JPEG is deleted. A computer's
+ * browser opens the same page.
  *
  * Copyright (C) 2026 Gary Riches
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -110,34 +104,6 @@ static const char kStyle[] =
     ".ok{font-size:56px;margin:10px 0 0}.err{color:#ff9b9b}.small{font-size:14px;color:#9aa0c8;margin-top:18px}"
     "</style>";
 
-static void page_form(buf_t *out, const char *code, const char *message)
-{
-    buf_printf(out, "<!doctype html><html><head><meta charset=utf-8><title>Art Swap: your key</title>%s</head><body><main>",
-               kStyle);
-    buf_printf(out, "<div class=brand><span></span>Art Swap on your PS5</div>"
-                    "<h1>Add your SteamGridDB API key</h1>"
-                    "<p>Art Swap finds new icons and backgrounds on SteamGridDB. Its API needs a key of your own: "
-                    "it is free.</p>"
-                    "<ol><li>Sign in (or make a free account) at "
-                    "<a href='https://www.steamgriddb.com/profile/preferences/api' target=_blank>steamgriddb.com</a>.</li>"
-                    "<li>Open <b>Preferences</b>, then <b>API</b>, and copy your key.</li>"
-                    "<li>Paste it below and press Save. Your PS5 shows when it is in.</li></ol>");
-    if (message && message[0])
-        buf_printf(out, "<p class=err>%s</p>", message);
-    buf_printf(out, "<form class=card method=post action='/'>");
-    if (code && code[0])
-        buf_printf(out, "<input type=hidden name=code value='%s'>", code);
-    else
-        buf_printf(out, "<label for=code>The code on your TV</label>"
-                        "<input class=code id=code name=code inputmode=numeric maxlength=4 autocomplete=off required>");
-    buf_printf(out, "<label for=key>Your API key</label>"
-                    "<input id=key name=key autocomplete=off autocapitalize=off spellcheck=false required "
-                    "placeholder='32 letters and numbers'>"
-                    "<button>Save to my PS5</button></form>"
-                    "<p class=small>The key stays on your PS5 (in /data/artswap). This page closes when you leave "
-                    "the key screen on your TV.</p></main></body></html>");
-}
-
 /* Sends the files chosen, one PUT /upload?code=&name= each, the TV listing them as they come */
 static void page_music(buf_t *out, const char *code)
 {
@@ -226,22 +192,12 @@ static void page_pictures(buf_t *out, const char *code)
                     "</script></body></html>");
 }
 
-static void page_done(buf_t *out)
-{
-    buf_printf(out, "<!doctype html><html><head><meta charset=utf-8><title>Art Swap: key saved</title>%s</head><body><main>"
-                    "<div class=brand><span></span>Art Swap on your PS5</div><div class=ok>&#10003;</div>"
-                    "<h1>Your key is saved</h1><p>SteamGridDB accepted it, and Art Swap on your PS5 is ready. "
-                    "You can close this page.</p></main></body></html>",
-               kStyle);
-}
-
 static void page_closed(buf_t *out)
 {
     buf_printf(out, "<!doctype html><html><head><meta charset=utf-8><title>Art Swap</title>%s</head><body><main>"
                     "<div class=brand><span></span>Art Swap on your PS5</div>"
-                    "<h1>This page has closed</h1><p>Open it again in Art Swap on your PS5 (the key in its "
-                    "settings, Music's <b>From your phone</b>, or the picker's <b>Your pictures</b>), and scan the "
-                    "new code.</p></main></body></html>",
+                    "<h1>This page has closed</h1><p>Open it again in Art Swap on your PS5 (Music's "
+                    "<b>From your phone</b>, or the picker's <b>Your pictures</b>), and scan the new code.</p></main></body></html>",
                kStyle);
 }
 
@@ -512,7 +468,6 @@ static void serve(int fd)
     char code[8];
     char path[300] = "";
     sscanf(request, "%*s %299s", path);
-    const bool post = strncmp(request, "POST ", 5) == 0;
     pthread_mutex_lock(&g_lock);
     const phone_mode_t mode = g_mode;
     pthread_mutex_unlock(&g_lock);
@@ -523,11 +478,11 @@ static void serve(int fd)
         const char *query = strchr(path, '?');
         const char *encoding = header_value(request, "Transfer-Encoding");
         const bool chunked = encoding != NULL && strstr(encoding, "chunked") != NULL;
-        if (mode != PHONE_KEY && strncmp(path, "/upload?", 8) == 0 && body)
+        if (strncmp(path, "/upload?", 8) == 0 && body)
             upload(fd, mode, code, query + 1, body, (size_t)(request + used - body), content_length, chunked);
         else
             answer(fd, 404, "Nothing to send here.");
-    } else if (!post) {
+    } else if (strncmp(request, "POST ", 5) != 0) {
         /* the QR code's address carries the code: /1234 */
         const bool with_code = strcmp(path + 1, code) == 0;
         if (strcmp(path, "/favicon.ico") == 0) {
@@ -535,41 +490,12 @@ static void serve(int fd)
         } else {
             if (mode == PHONE_MUSIC)
                 page_music(&page, with_code ? code : NULL);
-            else if (mode == PHONE_PICTURES)
-                page_pictures(&page, with_code ? code : NULL);
             else
-                page_form(&page, with_code ? code : NULL, NULL);
+                page_pictures(&page, with_code ? code : NULL);
             respond(fd, 200, &page);
         }
-    } else if (mode != PHONE_KEY) {
-        answer(fd, 404, "Nothing to send here.");
     } else {
-        char sent_code[16], key[96];
-        form_value(body ? body : "", "code", sent_code, sizeof(sent_code));
-        form_value(body ? body : "", "key", key, sizeof(key));
-        if (strcmp(sent_code, code) != 0) {
-            wrong_code();
-            page_form(&page, NULL, "That is not the code on your TV.");
-            respond(fd, 403, &page);
-        } else {
-            char err[300] = "";
-            if (!sgdb_check_key(key, err, sizeof(err))) {
-                char message[400];
-                snprintf(message, sizeof(message), "SteamGridDB did not accept that key (%s). Copy it again from "
-                                                   "Preferences, API, and paste it here.",
-                         err);
-                page_form(&page, code, message);
-                respond(fd, 200, &page);
-            } else if (!config_set_key(key)) {
-                page_form(&page, code, "Your PS5 could not keep the key. Try again.");
-                respond(fd, 200, &page);
-            } else {
-                log_line("phone: key saved");
-                page_done(&page);
-                respond(fd, 200, &page);
-                phone_stop();
-            }
-        }
+        answer(fd, 404, "Nothing to send here.");
     }
     buf_free(&page);
 }

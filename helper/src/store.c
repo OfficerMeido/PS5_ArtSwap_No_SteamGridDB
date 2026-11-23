@@ -127,7 +127,7 @@ bool store_logo(const app_t *app, buf_t *out, char *err, size_t errlen)
     }
     buf_t png = {0};
     art_format_t fmt;
-    const bool ok = sgdb_fetch(url, &png, err, errlen) && image_probe(png.data, png.len, &fmt);
+    const bool ok = net_fetch(url, &png, err, errlen) && image_probe(png.data, png.len, &fmt);
     buf_free(&png);
     if (!ok) {
         if (!err[0])
