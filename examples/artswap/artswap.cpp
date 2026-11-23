@@ -1,6 +1,6 @@
 /*
  * Art Swap - change the home-screen art of the titles on the console with
- * SteamGridDB's.
+ * pictures of your own.
  *
  * This file is compiled inside the namespace the template wraps each program
  * in (ps5/src/wrap.cpp.in); the program itself is kit/program.cpp, compiled
