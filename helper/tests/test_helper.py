@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Art Swap helper - the whole protocol against a made-up console, with the real SteamGridDB.
+# Art Swap helper - the whole protocol against a made-up console.
 #
 #   helper/tools/build.sh host && python3 helper/tests/test_helper.py [WORK_DIR]
 #
@@ -13,8 +13,8 @@
 # person's own pictures; and, on a console of its own, the home screen's
 # layout (a made-up database with two users, then a copy of Gary's real one
 # when this machine has it).
-# Needs network access and a SteamGridDB key: SGDB_KEY in .env goes into the
-# made-up console's /data/artswap/apikey.txt, as a person's own key would.
+# The pictures the tests apply are the person's own (mine:<name>), made here. Only the PlayStation Store
+# logo part needs network access (Sony's public catalog).
 #
 # Copyright (C) 2026 Gary Riches
 # SPDX-License-Identifier: GPL-3.0-or-later
@@ -48,14 +48,6 @@ PORT = 19117
 PHONE_PORT = 19118
 SMP_PORT = 19101
 failures = []
-
-
-def env_key():
-    env = ROOT / ".env"
-    for line in env.read_text().splitlines() if env.exists() else []:
-        if line.startswith("SGDB_KEY="):
-            return line.split("=", 1)[1].strip()
-    sys.exit("put SGDB_KEY=<your SteamGridDB key> in .env first")
 
 
 def check(condition, what):
@@ -225,6 +217,29 @@ def wait_port(port, seconds=10):
     return False
 
 
+def make_fixture_pictures(folder):
+    """The art the tests apply, as the person's own pictures: a square icon, a cover, two wide backgrounds (3840x1240
+    and 1920x620) and a logo. Each has something different at every corner, so a crop or a zoom is visible."""
+    def art(size, seed):
+        w, h = size
+        across = Image.linear_gradient("L").transpose(Image.Transpose.ROTATE_90).resize(size)
+        down = Image.linear_gradient("L").resize(size)
+        third = Image.eval(across, lambda v: (v * seed) % 256)
+        return Image.merge("RGB", (across, down, third))
+    made = {
+        "square.png": art((1024, 1024), 3),
+        "cover.png": art((600, 900), 5),
+        "hero.png": art((3840, 1240), 7),
+        "hero2.png": art((1920, 620), 11),
+    }
+    for name, image in made.items():
+        image.save(folder / name)
+    logo = Image.new("RGBA", (1000, 400), (0, 0, 0, 0))
+    logo.paste(Image.new("RGBA", (700, 200), (240, 240, 240, 255)), (150, 100))
+    logo.save(folder / "logo.png")
+    return ["square.png", "cover.png", "hero.png", "hero2.png", "logo.png"]
+
+
 def make_song(path, seconds=40, rate=44100):
     """A stereo WAV that sounds like something: a chord, a beat, a slow swell"""
     import math
@@ -300,7 +315,7 @@ def pictures_tests(h, base, work):
     check((w, hh) == (160, 90), f"THUMB takes one of the person's pictures ({w}x{hh})")
     w, hh, _ = h.ask("PREVIEW", "mine:photo.jpg", "icon", "cover", "0", "0", "512", "512")
     check((w, hh) == (512, 512), f"PREVIEW frames one as an icon ({w}x{hh})")
-    for bad in ("mine:../apikey.txt", "mine:.hidden.png", "mine:missing.png", "mine:", "mine:a\\b.png"):
+    for bad in ("mine:../secret.txt", "mine:.hidden.png", "mine:missing.png", "mine:", "mine:a\\b.png"):
         try:
             h.ask("THUMB", bad, "64", "64")
             check(False, f"{bad} is refused")
@@ -324,13 +339,13 @@ def pictures_tests(h, base, work):
 
     check(h.ask("PICDEL", "plain.PNG") == "" and not (folder / "plain.PNG").exists(), "PICDEL deletes a picture")
     check("plain.PNG" not in [r[1] for r in h.rows("PICTURES") if r[0] == "F"], "... and PICTURES no longer lists it")
-    for bad in ("../apikey.txt", ".hidden.png", "missing.png"):
+    for bad in ("../secret.txt", ".hidden.png", "missing.png"):
         try:
             h.ask("PICDEL", bad)
             check(False, f"PICDEL {bad} is refused")
         except HelperError as e:
             check(True, f"PICDEL {bad} is refused ({e})")
-    check((base / "data/artswap/apikey.txt").exists() and (folder / ".hidden.png").exists(),
+    check((base / "data/artswap/secret.txt").exists() and (folder / ".hidden.png").exists(),
           "PICDEL leaves anything else alone")
 
     # sent from a phone
@@ -380,8 +395,8 @@ def pictures_tests(h, base, work):
           f"a file that is not a PNG or a JPEG is deleted ({status} {text})")
     status, _ = put("5151", "song.mp3", png)
     check(status == 400, "only .png, .jpg and .jpeg names")
-    status, _ = put("5151", "../../apikey.png", png)
-    check(status == 200 and (folder / "apikey.png").exists() and not (base / "apikey.png").exists(),
+    status, _ = put("5151", "../../secret.png", png)
+    check(status == 200 and (folder / "secret.png").exists() and not (base / "secret.png").exists(),
           "a name with folders in it lands in the pictures folder")
     check(put("1111", "x.png", png)[0] == 403, "a wrong code sends no picture")
     conn = http.client.HTTPConnection("127.0.0.1", PHONE_PORT, timeout=30)
@@ -394,7 +409,7 @@ def pictures_tests(h, base, work):
     check(not list(folder.glob(".*partial")) or [p.name for p in folder.glob(".*partial")] == [".upload.png.partial"],
           "no partial picture is left")
     names = [r[1] for r in h.rows("PICTURES") if r[0] == "F"]
-    check(names[:2] == ["apikey.png", "IMG_0001.JPG"] or set(names[:3]) >= {"apikey.png", "IMG_0001.JPG"},
+    check(names[:2] == ["secret.png", "IMG_0001.JPG"] or set(names[:3]) >= {"secret.png", "IMG_0001.JPG"},
           f"what a phone sent comes first ({names[:4]})")
     try:
         urllib.request.urlopen(page + "/upload?code=5151&name=x.png", data=b"x", timeout=5)
@@ -773,8 +788,11 @@ def main() -> int:
     shots.mkdir()
     originals = {p: sha(p) for p in base.rglob("*") if p.is_file() and p.suffix in (".png", ".dds")}
 
-    key = env_key()
-    (base / "data/artswap/apikey.txt").write_text(key + "\n")
+    # a file beside the helper's own, which no picture name may reach (the tests that try ../ names)
+    (base / "data/artswap/secret.txt").write_text("not for pictures\n")
+    pics = base / "data/artswap/pictures"
+    pics.mkdir(parents=True, exist_ok=True)
+    fixtures = make_fixture_pictures(pics)
     env = dict(os.environ, ARTSWAP_ROOT=str(base), ARTSWAP_PORT=str(PORT), ARTSWAP_PHONE_PORT=str(PHONE_PORT),
                ARTSWAP_LAN="127.0.0.1", ARTSWAP_SMP_PORT=str(SMP_PORT))
     smp = fake_smp.serve(base, SMP_PORT)
@@ -802,7 +820,7 @@ def main() -> int:
         hello = dict(r[:2] for r in h.rows("HELLO"))
         check(hello.get("artswapd") == "0.6.0", f"HELLO names the version ({hello})")
         check(hello.get("store") == "off", "PlayStation Store logos start off")
-        check(hello.get("key") == "user", "the person's key (apikey.txt) is in")
+        check("key" not in hello, "HELLO has no API key line")
         check(hello.get("lan") == "127.0.0.1", "HELLO gives the console's address")
 
         apps = {r[1]: r for r in h.rows("APPS")}
@@ -817,14 +835,14 @@ def main() -> int:
         check(apps["CUSA00001"][2] == "Bloodborne" and apps["CUSA00001"][3] == "ps4", "a PS4 title named from param.sfo")
         check(apps["PPSA05678"][2] == "Astro Bot", "a name from app.db")
         check(apps["PPSA99316"][2] == "Burnout 3", "an unregistered homebrew title by its param.json")
-        check(ed[10] == "1", "APPS: a folder ShadowMountPlus installed can be refreshed")
-        check(apps["CUSA00001"][10] == "0" and apps["PPSA26525"][10] == "0",
+        check(ed[8] == "1", "APPS: a folder ShadowMountPlus installed can be refreshed")
+        check(apps["CUSA00001"][8] == "0" and apps["PPSA26525"][8] == "0",
               "APPS: a package and an image cannot be installed again (no rename)")
         check(apps["PPSA26525"][4] == "png 512x512 x2", f"an image's icon: appmeta and /user/app/<id>/sce_sys ({apps['PPSA26525'][4]})")
-        check(ed[11:14] == ["0", "-", "1"], f"APPS: homebrew on the home screen, no store concept, no logo ({ed[11:14]})")
-        check(apps["PPSA26525"][11] == "10012903", "APPS: a store game's concept")
-        check(apps["PPSA99316"][13] == "0", "APPS: a title the home screen does not list")
-        check(apps["PPSA99314"][15] == "314" and apps["PPSA99316"][15] == "0", "APPS: the home screen's order")
+        check(ed[9:12] == ["0", "-", "1"], f"APPS: homebrew on the home screen, no store concept, no logo ({ed[9:12]})")
+        check(apps["PPSA26525"][9] == "10012903", "APPS: a store game's concept")
+        check(apps["PPSA99316"][11] == "0", "APPS: a title the home screen does not list")
+        check(apps["PPSA99314"][13] == "314" and apps["PPSA99316"][13] == "0", "APPS: the home screen's order")
         check(h.rows("PREF", "sort")[0] == ["pref", "sort", ""], "PREF: nothing chosen yet")
         h.rows("PREF", "sort", "home screen")
         check(h.rows("PREF", "sort")[0][2] == "home screen", "PREF keeps a choice")
@@ -842,40 +860,31 @@ def main() -> int:
         check((w, hh) == (960, 540), "ART background (BC7) at 960x540")
         Image.frombytes("RGBA", (w, hh), rgba).save(shots / "ed-current-pic.png")
 
-        games = h.rows("SEARCH", "Eternal Darkness")
-        check(games and games[0][1] == "17", f"SEARCH finds Eternal Darkness first ({games[:2]})")
-        h.ask("MATCH", "PPSA99314", "17", games[0][2])
-        check(h.rows("APPS")[1 if False else 0] is not None and
-              {r[1]: r for r in h.rows("APPS")}["PPSA99314"][7] == "17", "MATCH is kept")
-        check((base / "data/artswap/matches.tsv").read_text().startswith("PPSA99314\t17\t"), "matches.tsv written")
+        found = {r[1] for r in h.rows("PICTURES") if r[0] == "F"}
+        check(found == set(fixtures), f"PICTURES lists the pictures made for the tests ({sorted(found)})")
+        for gone in ("SEARCH", "MATCH", "LIST", "KEY", "KEYSTATE"):
+            try:
+                h.rows(gone, "x", "y")
+                check(False, f"{gone} is not a request any more")
+            except HelperError as e:
+                check("unknown" in str(e).lower(), f"{gone} is not a request any more ({e})")
 
-        lists = {}
-        for kind in ("square", "covers", "heroes", "icons", "wide", "logos"):
-            rows = h.rows("LIST", 17, kind, 0)
-            items = [r for r in rows if r[0] == "I"]
-            lists[kind] = items
-            check(rows[0][0] == "P", f"LIST {kind}: {len(items)} pictures, page line {rows[0]}")
-        check(len(lists["square"]) >= 1 and len(lists["heroes"]) >= 1, "square art and heroes exist for ED")
-        check(all(int(r[4]) >= 192 for r in lists["icons"]), "small icons are hidden")
-
-        square, hero = lists["square"][0], lists["heroes"][0]
-        w, hh, rgba = h.ask("THUMB", square[3], 256, 256)
+        w, hh, rgba = h.ask("THUMB", "mine:square.png", 256, 256)
         check(max(w, hh) <= 256, f"THUMB fits 256 ({w}x{hh})")
-        w, hh, rgba = h.ask("PREVIEW", hero[2], "pic", "cover", "0", "0", 960, 540)
+        w, hh, rgba = h.ask("PREVIEW", "mine:hero.png", "pic", "cover", "0", "0", 960, 540)
         check((w, hh) == (960, 540), "PREVIEW cover at 960x540")
         Image.frombytes("RGBA", (w, hh), rgba).save(shots / "preview-cover.png")
-        w, hh, rgba = h.ask("PREVIEW", hero[2], "pic", "fit", "0", "0", 960, 540)
+        w, hh, rgba = h.ask("PREVIEW", "mine:hero.png", "pic", "fit", "0", "0", 960, 540)
         Image.frombytes("RGBA", (w, hh), rgba).save(shots / "preview-fit.png")
         # zoom: twice as close at the top left is the top-left quarter of the whole frame at twice the size
-        w, hh, rgba = h.ask("PREVIEW", hero[2], "pic", "cover", "-1", "-1", 960, 540, "2")
+        w, hh, rgba = h.ask("PREVIEW", "mine:hero.png", "pic", "cover", "-1", "-1", 960, 540, "2")
         close = Image.frombytes("RGBA", (w, hh), rgba).convert("RGB")
         close.save(shots / "preview-zoom.png")
-        w2, hh2, rgba = h.ask("PREVIEW", hero[2], "pic", "cover", "-1", "-1", 1920, 1080)
+        w2, hh2, rgba = h.ask("PREVIEW", "mine:hero.png", "pic", "cover", "-1", "-1", 1920, 1080)
         quarter = Image.frombytes("RGBA", (w2, hh2), rgba).convert("RGB").crop((0, 0, 960, 540))
         diff = sum(abs(a - b) for pa, pb in zip(close.get_flattened_data(), quarter.get_flattened_data()) for a, b in zip(pa, pb))
         check(diff / (960 * 540 * 3) < 3, f"PREVIEW zoom 2 is the quarter it should be (mean difference {diff / (960 * 540 * 3):.2f})")
-        cover = lists["covers"][0]
-        w, hh, rgba = h.ask("PREVIEW", cover[2], "icon", "fit", "0", "0", 512, 512)
+        w, hh, rgba = h.ask("PREVIEW", "mine:cover.png", "icon", "fit", "0", "0", 512, 512)
         Image.frombytes("RGBA", (w, hh), rgba).save(shots / "preview-icon-fit.png")
 
         try:
@@ -885,8 +894,7 @@ def main() -> int:
             check(True, "a picture from elsewhere is refused")
 
         # a logo on the game's home-screen page: the PNG beside its art, the database pointed at it
-        logo = lists["logos"][0]
-        report = h.rows("LOGO", "PPSA99314", logo[2])
+        report = h.rows("LOGO", "PPSA99314", "mine:logo.png")
         logo_png = base / "user/appmeta/PPSA99314/logo.png"
         check(any(r[0] == "W" and r[1] == "/user/appmeta/PPSA99314/logo.png" for r in report), f"LOGO writes logo.png ({report})")
         check(logo_png.exists() and Image.open(logo_png).format == "PNG", "logo.png is a PNG")
@@ -901,9 +909,9 @@ def main() -> int:
         first.close()
         w, hh, rgba = h.ask("ART", "PPSA99314", "logo", 600, 300)
         check(w <= 600 and hh <= 300, f"ART logo ({w}x{hh})")
-        check({r[1]: r for r in h.rows("APPS")}["PPSA99314"][12] == "art", "APPS: Art Swap's logo")
+        check({r[1]: r for r in h.rows("APPS")}["PPSA99314"][10] == "art", "APPS: Art Swap's logo")
         try:
-            h.rows("LOGO", "PPSA99316", logo[2])
+            h.rows("LOGO", "PPSA99316", "mine:logo.png")
             check(False, "LOGO refuses a title the home screen does not list")
         except HelperError as e:
             check("no entry" in str(e), f"LOGO refuses a title the home screen does not list ({e})")
@@ -942,7 +950,7 @@ def main() -> int:
         icon_meta = base / "user/appmeta/PPSA99314/icon0.png"
         icon_hb = base / "data/homebrew/PPSA99314/sce_sys/icon0.png"
         t = time.time()
-        report = h.rows("APPLY", "PPSA99314", "icon", square[2], "cover", "0", "0")
+        report = h.rows("APPLY", "PPSA99314", "icon", "mine:square.png", "cover", "0", "0")
         print(f"     icon applied in {time.time() - t:.1f} s: {report}")
         check(sum(r[0] == "W" for r in report) == 2 and sum(r[0] == "O" for r in report) == 2, "APPLY icon writes two and keeps two originals")
         for p in (icon_meta, icon_hb):
@@ -953,7 +961,7 @@ def main() -> int:
 
         # the background: BC7, the header kept, four files
         t = time.time()
-        report = h.rows("APPLY", "PPSA99314", "pic", hero[2], "cover", "0.3", "0")
+        report = h.rows("APPLY", "PPSA99314", "pic", "mine:hero.png", "cover", "0.3", "0")
         print(f"     background applied in {time.time() - t:.1f} s")
         check(sum(r[0] == "W" for r in report) == 4, "APPLY pic writes pic0 and pic1, both copies")
         for p in sorted(base.rglob("pic*.dds")):
@@ -966,18 +974,18 @@ def main() -> int:
         im.convert("RGB").resize((960, 540)).save(shots / "ed-new-pic0.png")
 
         # again: the originals stay the first ones
-        h.rows("APPLY", "PPSA99314", "icon", lists["square"][-1][2], "cover", "0", "0")
+        h.rows("APPLY", "PPSA99314", "icon", "mine:cover.png", "cover", "0", "0")
         check(sha(str(icon_meta) + ".old") == originals[icon_meta], "a second change keeps the first original")
 
         # the home screen's copy made again from the folder without its .old (an install whose copy-back
         # did not happen): the next change keeps the folder's original for it, not the art shown now
         Path(str(icon_meta) + ".old").unlink()
         shutil.copy(icon_hb, icon_meta)
-        h.rows("APPLY", "PPSA99314", "icon", square[2], "cover", "0", "0")
+        h.rows("APPLY", "PPSA99314", "icon", "mine:square.png", "cover", "0", "0")
         check(sha(str(icon_meta) + ".old") == originals[icon_meta], "a copy that lost its .old keeps the folder's original")
 
         # a PS4 title's PNG background (RGB), fit mode
-        report = h.rows("APPLY", "CUSA00001", "pic", hero[2], "fit", "0", "0")
+        report = h.rows("APPLY", "CUSA00001", "pic", "mine:hero.png", "fit", "0", "0")
         im = Image.open(base / "user/appmeta/CUSA00001/pic0.png")
         check(im.size == (1920, 1080) and im.mode == "RGB", f"PS4 pic0.png stays 1920x1080 RGB ({im.mode})")
         im.save(shots / "ps4-new-pic0-fit.png")
@@ -1119,7 +1127,7 @@ def main() -> int:
         h.rows("RENAME", "PPSA99314", new_name)
         check(Path(str(folder_param) + ".old").read_text() == original_param, "a second rename keeps the first original")
         apps = {r[1]: r for r in h.rows("APPS")}
-        check(apps["PPSA99314"][2] == new_name and apps["PPSA99314"][9] == "1",
+        check(apps["PPSA99314"][2] == new_name and apps["PPSA99314"][7] == "1",
               f"APPS: the new name, its original kept ({apps['PPSA99314']})")
         for title, name, why in (("CUSA00001", "Bloodborne 2", "package"), ("PPSA99314", "a\x01b", "character")):
             try:
@@ -1196,11 +1204,11 @@ def main() -> int:
         psp = base / "data/homebrew/PPSA99131/sce_sys/pic0.dds"
         check({r[1]: r for r in h.rows("APPS")}["PPSA99131"][5] == "-", "PSP5 has no background")
         try:
-            h.rows("APPLY", "PPSA05678", "pic", hero[2], "cover", "0", "0")
+            h.rows("APPLY", "PPSA05678", "pic", "mine:hero.png", "cover", "0", "0")
             check(False, "no background is added to a game ShadowMountPlus cannot install again")
         except HelperError as e:
             check("installed from a folder" in str(e), f"no background is added to a game it cannot install ({e})")
-        report = h.rows("APPLY", "PPSA99131", "pic", hero[2], "cover", "0", "0")
+        report = h.rows("APPLY", "PPSA99131", "pic", "mine:hero.png", "cover", "0", "0")
         im = Image.open(psp)
         im.load()
         check(im.size == (3840, 2160) and dds_info(psp)[1] == 8294548,
@@ -1212,7 +1220,7 @@ def main() -> int:
             "0000000000000000100000000000000000000000000000000000006200000003000000000000000100000000000000")
         check(dds_info(psp)[0] == astro_header, "its header is the one the console writes for its own")
         check(not Path(str(psp) + ".old").exists(), "an added background has no original")
-        check({r[1]: r for r in h.rows("APPS")}["PPSA99131"][14] == "1", "APPS: a background Art Swap added")
+        check({r[1]: r for r in h.rows("APPS")}["PPSA99131"][12] == "1", "APPS: a background Art Swap added")
         pend = {r[1]: r[2] for r in h.rows("PENDING") if r[0] == "P"}
         check(pend.get("PPSA99131") == "install", f"an added background waits for an install ({pend})")
         check(pend.get("PPSA99314") == "name", f"the restored name waits for Apply changes ({pend})")
@@ -1241,10 +1249,10 @@ def main() -> int:
         # Restore straight after the install: the install's copies go too
         report = h.rows("RESTORE", "PPSA99131", "all")
         check(not list(base.rglob("PPSA99131/**/pic0.dds")), f"RESTORE deletes the install's copies too ({report})")
-        h.rows("APPLY", "PPSA99131", "pic", hero[2], "cover", "0", "0")
+        h.rows("APPLY", "PPSA99131", "pic", "mine:hero.png", "cover", "0", "0")
         shutil.copy(psp, base / "user/appmeta/PPSA99131/pic0.dds")  # as an install copies it
         h.rows("APPS", "rescan")
-        h.rows("APPLY", "PPSA99131", "pic", lists["heroes"][-1][2], "fit", "0", "0")
+        h.rows("APPLY", "PPSA99131", "pic", "mine:hero2.png", "fit", "0", "0")
         check(not list(base.rglob("PPSA99131/**/pic0.dds.old")), "changing an added background keeps no original")
         report = h.rows("RESTORE", "PPSA99131", "all")
         check(not list(base.rglob("PPSA99131/**/pic0.dds")), f"RESTORE deletes the added background, every copy ({report})")
@@ -1276,7 +1284,7 @@ def main() -> int:
         check(fields[0] == "clip" and fields[1] == "960000" and len(pcm) == 960000 * 4 and abs(float(fields[3]) + 28) < 0.5,
               f"CLIP: 20 s of 48 kHz stereo at -28 LUFS ({fields})")
         try:
-            h.rows("SONG", "../apikey.txt")
+            h.rows("SONG", "../secret.txt")
             check(False, "SONG refuses a path")
         except HelperError:
             check(True, "SONG refuses a path")
@@ -1294,7 +1302,7 @@ def main() -> int:
         params = json.loads((base / "data/homebrew/PPSA99314/sce_sys/param.json").read_text())
         check(abs(float(params["pubtools"]["loudnessSnd0"]) + 28) < 0.5, f"param.json's loudnessSnd0 ({params['pubtools']})")
         apps = {r[1]: r for r in h.rows("APPS")}
-        check(apps["PPSA99314"][16].startswith("at9 30s") and apps["PPSA99314"][17] == "1", f"APPS: its music, added ({apps['PPSA99314'][16:18]})")
+        check(apps["PPSA99314"][14].startswith("at9 30s") and apps["PPSA99314"][15] == "1", f"APPS: its music, added ({apps['PPSA99314'][14:16]})")
         pend = {r[1]: r[2] for r in h.rows("PENDING") if r[0] == "P"}
         check(pend.get("PPSA99314") == "install", f"added music waits for an install ({pend})")
         # a title with its own: written over it, the original kept
@@ -1349,68 +1357,43 @@ def main() -> int:
         conn.close()
         check(status == 200 and (music / "In chunks.mp3").read_bytes() == song_mp3, f"a song sent in chunks arrives whole ({status})")
         check(put("1111", "x.mp3", b"abc") == 403, "a wrong code sends nothing")
-        check(put("4242", "../../apikey.txt", b"abc") == 400, "only music, by a plain name")
+        check(put("4242", "../../secret.txt", b"abc") == 400, "only music, by a plain name")
         check(not list(music.glob(".*partial")), "no partial file is left")
         h.ask("PHONE")
         time.sleep(1.0)
 
+        for name in fixtures:
+            (pics / name).unlink()
         pictures_tests(h, base, work)
 
-        # the key
-        try:
-            h.ask("KEY", "0123456789abcdef0123456789abcdef")
-            check(False, "a wrong key is refused")
-        except HelperError as e:
-            check("401" in str(e) or "refused" in str(e), f"a wrong key is refused ({e})")
-        check("key\tnone" in h.ask("KEY", ""), "KEY with nothing removes the key")
-        check(not (base / "data/artswap/apikey.txt").exists(), "apikey.txt is gone")
-        try:
-            h.rows("SEARCH", "Portal")
-            check(False, "with no key, SteamGridDB is not asked")
-        except HelperError as e:
-            check("No SteamGridDB key" in str(e), f"with no key, the answer says how to add one ({e})")
-
-        # the key page, from a phone
+        # the phone page: nothing listens until PHONE opens it; the code on the TV is asked for
         page = f"http://127.0.0.1:{PHONE_PORT}"
         try:
             urllib.request.urlopen(page + "/1234", timeout=2)
             check(False, "nothing listens before PHONE")
         except (urllib.error.URLError, ConnectionError, OSError):
             check(True, "nothing listens before PHONE")
-        rows = dict(r[:2] for r in h.rows("PHONE", "4831"))
+        rows = dict(r[:2] for r in h.rows("PHONE", "4831", "pictures"))
         check(rows.get("lan") == "127.0.0.1" and rows.get("port") == str(PHONE_PORT), f"PHONE opens the page ({rows})")
         time.sleep(0.5)
         html = urllib.request.urlopen(page + "/4831", timeout=5).read().decode()
-        check("Add your SteamGridDB API key" in html and "name=code value='4831'" in html, "the QR code's page carries the code")
+        check("Send pictures to your PS5" in html and "value='4831'" in html, "the QR code's page carries the code")
+        check("SteamGridDB" not in html and "API key" not in html, "the page has nothing about an API key")
         html = urllib.request.urlopen(page + "/", timeout=5).read().decode()
         check("The code on your TV" in html, "the plain address asks for the code")
-        (work / "shots/phone-page.html").write_text(urllib.request.urlopen(page + "/4831", timeout=5).read().decode())
-
-        def post(code, value):
-            data = urllib.parse.urlencode({"code": code, "key": value}).encode()
-            try:
-                response = urllib.request.urlopen(page + "/", data=data, timeout=30)
-                return response.status, response.read().decode()
-            except urllib.error.HTTPError as e:
-                return e.code, e.read().decode()
-
-        status, html = post("1111", key)
-        check(status == 403 and "not the code on your TV" in html, f"a wrong code is refused ({status})")
-        check("key\tnone" in h.ask("KEYSTATE"), "a wrong code saves nothing")
-        status, html = post("4831", "0123456789abcdef0123456789abcdef")
-        check(status == 200 and "did not accept that key" in html, "a key SteamGridDB refuses is not kept")
-        check("key\tnone" in h.ask("KEYSTATE"), "... and nothing is saved")
-        status, html = post("4831", key)
-        check(status == 200 and "Your key is saved" in html, f"the right code and key are saved ({status})")
-        (work / "shots/phone-done.html").write_text(html)
-        check("key\tuser" in h.ask("KEYSTATE"), "KEYSTATE says the key is in")
-        check((base / "data/artswap/apikey.txt").read_text().strip() == key, "apikey.txt holds the key")
-        time.sleep(1.0)
         try:
-            urllib.request.urlopen(page + "/4831", timeout=2)
-            check(False, "the page closes once the key is in")
-        except (urllib.error.URLError, ConnectionError, OSError):
-            check(True, "the page closes once the key is in")
+            urllib.request.urlopen(urllib.request.Request(page + "/upload?code=1111&name=x.png", data=b"x", method="PUT"),
+                                   timeout=5)
+            check(False, "a wrong code is refused")
+        except urllib.error.HTTPError as e:
+            check(e.code in (400, 403), f"a wrong code is refused ({e.code})")
+        try:
+            urllib.request.urlopen(urllib.request.Request(page + "/", data=b"code=4831&key=abc", method="POST"), timeout=5)
+            check(False, "there is no key form to post to")
+        except urllib.error.HTTPError as e:
+            check(e.code == 404, f"there is no key form to post to ({e.code})")
+        h.ask("PHONE")
+        time.sleep(1.0)
         h.rows("PHONE", "5555")
         time.sleep(0.5)
         h.ask("PHONE")

@@ -5,8 +5,8 @@
  *
  * Makes the helper's own requests (http_ps5.c), each on a thread of its own
  * with a clock that logs every five seconds it is still waiting, to
- * /data/artswap/nettest.log: SteamGridDB's API with a key that is not one (a
- * quick 401 means HTTPS works), a picture from its CDN, and plain HTTP.
+ * /data/artswap/nettest.log: an HTTPS page, PlayStation Store's image server
+ * (where Store logos come from), and plain HTTP.
  *
  * Copyright (C) 2026 Gary Riches
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -74,8 +74,8 @@ int main(void)
         log_line("http_init failed: %s", err);
         return 1;
     }
-    run("https://www.steamgriddb.com/api/v2/search/autocomplete/portal", "0123456789abcdef0123456789abcdef", 60);
-    run("https://cdn2.steamgriddb.com/thumb/dce5eb1f56dd8dd4e1b9a1e22c0e1be0.jpg", NULL, 40);
+    run("https://example.com/", NULL, 60);
+    run("https://image.api.playstation.com/", NULL, 40);
     run("http://example.com/", NULL, 30);
     log_line("nettest done");
     return 0;

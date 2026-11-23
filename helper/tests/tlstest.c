@@ -93,8 +93,8 @@ int main(void)
     const int tmpl = CreateTemplate(ctx, "ArtSwap-tlstest", 2, 1);
     log_line("pool %d ssl %d http %d template %d", pool, sslctx, ctx, tmpl);
     static const char *urls[] = {"http://example.com/", "https://example.com/",
-                                 "https://www.steamgriddb.com/api/v2/search/autocomplete/portal",
-                                 "https://cdn2.steamgriddb.com/thumb/dce5eb1f56dd8dd4e1b9a1e22c0e1be0.jpg"};
+                                 "https://store.playstation.com/",
+                                 "https://image.api.playstation.com/"};
     log_line("--- the system's checks");
     for (int i = 0; i < 4; i++)
         get(tmpl, urls[i]);
