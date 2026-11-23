@@ -1,4 +1,4 @@
-# Art Swap
+# Art Swap without SteamGridDB
 [![licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
 
 **Change the icon, background, logo and music of any title on your PS5's home
