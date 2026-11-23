@@ -6,10 +6,7 @@
 # Builds the helper for Linux and the preview tool (the kit, the screens,
 # tools/preview/preview_main.cpp), lays out a made-up console
 # (helper/tests/test_helper.py's), starts the helper on it, and runs the
-# preview's script of presses against it. The helper talks to SteamGridDB, so
-# this needs the network and a key: SGDB_KEY in .env goes into the made-up
-# console's /data/artswap/apikey.txt (NOKEY=1 leaves it out, to see Art Swap
-# without one). SEED=folder is copied over the made-up console first (for
+# preview's script of presses against it. SEED=folder is copied over the made-up console first (for
 # example data/artswap/pending.txt, to start with changes waiting).
 #
 # Copyright (C) 2026 Gary Riches
@@ -17,7 +14,7 @@
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 if [[ $(uname) == Darwin ]]; then
-    exec limactl shell --workdir / ps5 -- env NOKEY="${NOKEY:-}" SEED="${SEED:-}" bash -lc 'cd "$1"; shift; exec bash tools/preview/run.sh "$@"' _ "$root" "$@"
+    exec limactl shell --workdir / ps5 -- env SEED="${SEED:-}" bash -lc 'cd "$1"; shift; exec bash tools/preview/run.sh "$@"' _ "$root" "$@"
 fi
 script=${1:-}
 work=$HOME/ps5/build/artswap-preview
@@ -75,8 +72,6 @@ test_helper.make_console(base)
 test_helper.make_song(base / "data/artswap/music/Theme.wav", 45)
 PY
 [[ -z ${SEED:-} ]] || cp -R "$SEED"/. "$work/console-root/"
-key=$(sed -n 's/^SGDB_KEY=//p' "$root/.env" 2>/dev/null || true)
-[[ -n ${NOKEY:-} || -z $key ]] || printf '%s\n' "$key" > "$work/console-root/data/artswap/apikey.txt"
 port=19217
 # ShadowMountPlus's API, as helper/tests/fake_smp.py plays it, for the home-screen refresh
 python3 "$root/helper/tests/fake_smp.py" "$work/console-root" 19201 &

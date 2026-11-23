@@ -3,7 +3,7 @@
 //   preview ASSETS_DIR OUTPUT_DIR PORT [SCRIPT]
 //
 // The real screens (examples/artswap/kit/app.cpp) and the real helper's host
-// build (helper/, on a made-up console, talking to SteamGridDB), driven by a
+// build (helper/, on a made-up console), driven by a
 // script of button presses in real time, drawn by the kit's Vulkan renderer
 // on the PC's Vulkan driver (lavapipe), a PNG at each named step. The script
 // is one step a line: "WAIT ACTION [NAME]" (seconds, then a press: cross,
