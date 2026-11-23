@@ -5,11 +5,11 @@
  * They are kept on the console in /data/artswap/pictures. A phone or a
  * computer on the same network sends them: the add cell, first in the grid,
  * opens a sheet with a QR code and the helper serves a page for the code
- * shown (PHONE <code> pictures, phone.c), as it does for the key and music.
+ * shown (PHONE <code> pictures, phone.c), as it does for music.
  * FTP into the folder works as well. The helper reads one as "mine:<name>"
- * wherever it reads a SteamGridDB picture, so the frame page, the preview and
- * APPLY or LOGO treat them alike. With no SteamGridDB key the picker opens all
- * the same, with the person's own pictures only.
+ * wherever it reads a picture, so the frame page, the preview and
+ * APPLY or LOGO treat them alike. They are the picker's art, with, on the
+ * Logos tab of a store game, its own PlayStation Store logo after them.
  *
  * Copyright (C) 2026 Gary Riches
  * SPDX-License-Identifier: GPL-3.0-or-later
@@ -70,8 +70,8 @@ void draw_phone_glyph(gfx::DrawList &list, float cx, float cy, float s, Color in
 
 } // namespace
 
-// The person's pictures first, then SteamGridDB's art after them (set_tab). They are asked for before SteamGridDB's
-// list, so their places at the front of the grid never move under a thumbnail on its way.
+// The person's pictures first, then a store game's own logo after them (set_tab). They are asked for before the
+// store's logo, so their places at the front of the grid never move under a thumbnail on its way.
 void App::load_mine()
 {
     mine_loading_ = true;
@@ -103,7 +103,7 @@ void App::load_mine()
             }
         }
         mine_arts_ = static_cast<int>(arts_.size());
-        // a picture just sent is chosen; otherwise SteamGridDB's first takes the focus when it comes
+        // a picture just sent is chosen; otherwise the first of theirs
         art_focus_ = 0;
         for (int i = 1; i < mine_arts_ && !mine_focus_.empty(); ++i)
             if (arts_[static_cast<std::size_t>(i)]->url == "mine:" + mine_focus_)
@@ -111,15 +111,14 @@ void App::load_mine()
                 art_focus_ = i;
                 art_moved_ = true;
             }
-        if (art_focus_ == 0 && mine_arts_ > 1 && key_state_ != "user")
+        if (art_focus_ == 0 && mine_arts_ > 1)
             art_focus_ = 1;
         mine_focus_.clear();
         cell_ring_.snap(cell_rect(art_focus_));
         request_thumbs();
         if (art_focus_ > 0)
             preview_due_ = 0.0f;
-        if (key_state_ == "user")
-            match_and_list();
+        load_store_logo();
     }, true, gen);
 }
 
@@ -345,16 +344,6 @@ void App::draw_add_panel(gfx::DrawList &list) const
     ui::text(list, fonts_.mono,
              fonts_.mono.font->fit(mine_folder_.empty() ? std::string("/data/artswap/pictures") : mine_folder_, 22, w),
              x, y + 36, 22, kWhite.with_alpha(0.85f));
-    // with no key, the only pictures there are: where SteamGridDB's come from
-    if (key_state_ != "user")
-    {
-        y += 96;
-        list.circle(x + 6, y - 8, 5, kAmber);
-        ui::paragraph(list, fonts_.regular,
-                      "SteamGridDB has art for most games, made by its community. Add your own free key to see it "
-                      "here too.",
-                      x + 24, y, 21, w - 24, 31, kWhite.with_alpha(0.7f), 3);
-    }
 }
 
 } // namespace artswap

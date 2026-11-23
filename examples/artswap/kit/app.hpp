@@ -1,6 +1,6 @@
 /*
- * Art Swap - the screens: the titles on the console, the art SteamGridDB
- * has for one of them, the game it is matched with, and the settings.
+ * Art Swap - the screens: the titles on the console, the art for one of
+ * them, and the settings.
  *
  * The screens see only the kit's drawing types and the helper; the program
  * (../artswap.cpp) gives them textures through TextureSink, and the text
@@ -98,7 +98,6 @@ class App
         picker,
         frame,    // full page: the part of the chosen picture kept (the picker's triangle)
         settings, // full page: a rail of categories, a panel (settings.cpp)
-        connect,  // full page: adding the SteamGridDB key, the QR code showing (settings.cpp)
         music,    // the music the tile plays: a clip of a song of the person's (music.cpp)
         home,     // full page: where each tile goes on the home screen, and the order (home.cpp)
     };
@@ -107,7 +106,6 @@ class App
         none,
         confirm,
         working,
-        search,
         log,
         restore,
         refresh, // Rename: the new name, then installing the game again so the home screen shows it
@@ -162,9 +160,8 @@ class App
     void open_picker(int title, const std::string &slot);
     void load_current_art();
     void close_picker();
-    void match_and_list();
     void set_tab(int tab);
-    void load_page();
+    void load_store_logo();
     void request_thumbs();
     void request_preview();
     std::vector<int> tab_kinds() const; // the picker's tabs, as kinds of art: Icons, Backgrounds, Logos
@@ -211,7 +208,6 @@ class App
     void open_apply();
     void start_apply();
     void check_last_home();
-    void open_search(const std::string &term);
     // OPTIONS on the games: what is not a picture of the focused game
     struct MenuItem
     {
@@ -221,7 +217,6 @@ class App
     std::vector<MenuItem> menu_items() const;
     void open_menu();
     void menu_select(hui::ui::Feedback &feedback);
-    void choose_game(int row);
     void open_refresh(bool rename = false);
     void type_name();
     bool open_keyboard(const std::string &title, const std::string &initial, int max_length,
@@ -246,7 +241,7 @@ class App
     bool can_have_music(const Title &title) const;
 
     // ---- the person's own pictures, first in the picker (pictures.cpp) ----
-    void load_mine();                // PICTURES, then SteamGridDB's art after them
+    void load_mine();                // PICTURES, then a store game's own logo
     void open_pictures_phone();
     void delete_picture(); // PICDEL the focused picture of theirs, then the grid again
     void update_pictures_sheet(const hui::InputFrame &input, hui::ui::Feedback &feedback);
@@ -284,16 +279,9 @@ class App
     hui::gfx::Rect settings_rail_rect(int category) const;
     hui::gfx::Rect settings_row_rect(int category, int row) const;
     int settings_rows(int category) const;
-    void open_connect(const std::string &slot);
-    void update_connect(const hui::InputFrame &input, float dt, hui::ui::Feedback &feedback);
-    void draw_connect(hui::gfx::DrawList &list) const;
     void close_phone();
-    void leave_connect();
-    void key_added(const std::string &how);
-    // ✕ or △ on a title: the picker, or first the explanation when there is no key
+    // ✕ or △ on a title: the picker
     void want_picker(const std::string &slot, hui::ui::Feedback &feedback);
-    void type_key();
-    void type_search();
     void toast(const std::string &title, const std::string &detail, bool error = false);
 
     // ---- input ----
@@ -368,15 +356,10 @@ class App
     int generation_ = 1;
     std::vector<std::unique_ptr<Art>> arts_;
     int art_focus_ = 0;
-    int page_ = 0;
-    int total_ = 0;
-    int store_arts_ = 0;        // the store's own logo, first among the logos (not SteamGridDB's)
+    int store_arts_ = 0;        // the store's own logo, after the person's own pictures
     bool store_asked_ = false;  // asked for it since the tab opened
     bool store_unreachable_ = false; // PlayStation Store did not answer this run: not asked again
-    int hidden_ = 0;
     bool listing_ = false;
-    bool matching_ = false;
-    std::string list_error_;
     hui::ui::Scroller grid_scroll_;
     hui::ui::SpringRect cell_ring_;
     Framing framing_;          // the focused picture's
@@ -400,36 +383,25 @@ class App
 
     // the sheets
     hui::tween::Spring sheet_open_;
-    std::vector<std::vector<std::string>> results_; // search: G id name year verified
-    std::string search_term_;
-    bool searching_ = false;
-    std::string search_error_;
     int sheet_focus_ = 0;
     hui::tween::Spring sheet_focus_position_;
     std::string working_text_;
     std::string log_text_;
-    std::string pairing_code_;  // the connect page's code, new each time it opens
-    std::string phone_address_; // where the key page is, as the helper said
+    std::string pairing_code_;  // the phone page's code, new each time its sheet opens
+    std::string phone_address_; // where the phone page is, as the helper said
     std::string phone_error_;
     float phone_poll_ = 0.0f;
     bool phone_asking_ = false;
-    Screen connect_back_ = Screen::library; // where the connect page returns to
-    int connect_row_ = 0;
     float page_age_ = 0.0f; // seconds since a full page (or its category) came in
 
     // the settings page
     Screen settings_back_ = Screen::library;
     int settings_category_ = 0;
     bool settings_in_rows_ = false;
-    int settings_row_[3] = {0, 0, 0};
+    int settings_row_[2] = {0, 0};
     hui::ui::SpringRect page_focus_; // the one focus of a full page
     hui::tween::Spring rail_marker_; // the active category's plate on the rail
-    float remove_armed_ = 0.0f;      // Remove the key: a second ✕ within this many seconds removes it
-    std::string key_state_; // user or none: the helper's answer, then each change
-    std::string key_hint_;  // the key's last four characters
     bool store_logos_ = false;   // PlayStation Store logos, for store games (the helper's STORE)
-    bool key_explained_ = false; // the explanation has shown once this run
-    std::string pending_slot_;  // the picker to open once a key is in
     std::vector<Toast> toasts_;
 
     // the home-screen refresh

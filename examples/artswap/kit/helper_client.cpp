@@ -166,18 +166,6 @@ std::string Helper::backend() const
     return backend_;
 }
 
-std::string Helper::key_source() const
-{
-    std::lock_guard<std::mutex> hold(lock_);
-    return key_source_;
-}
-
-std::string Helper::key_hint() const
-{
-    std::lock_guard<std::mutex> hold(lock_);
-    return key_hint_;
-}
-
 std::string Helper::lan_address() const
 {
     std::lock_guard<std::mutex> hold(lock_);
@@ -329,11 +317,6 @@ int Helper::find_helper(std::string &version)
             if (row.size() >= 2 && row[0] == "artswapd")
                 version = row[1];
             std::lock_guard<std::mutex> lock(lock_);
-            if (row.size() >= 2 && row[0] == "key")
-            {
-                key_source_ = row[1];
-                key_hint_ = row.size() >= 3 ? row[2] : "";
-            }
             if (row.size() >= 2 && row[0] == "lan")
                 lan_address_ = row[1];
             if (row.size() >= 2 && row[0] == "http")

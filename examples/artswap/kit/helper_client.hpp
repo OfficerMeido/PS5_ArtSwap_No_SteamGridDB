@@ -67,8 +67,6 @@ class Helper
     }
     std::string status() const;
     std::string backend() const;   // the helper's network: http2, http1, curl or unavailable
-    std::string key_source() const; // user or none
-    std::string key_hint() const;   // the key's last four characters
     std::string lan_address() const; // the console's address on the network, when the helper knows it
 
     // A request; done runs in pump(). A queued request whose generation has
@@ -111,8 +109,6 @@ class Helper
     std::condition_variable wake_;
     std::string status_;
     std::string backend_;
-    std::string key_source_;
-    std::string key_hint_;
     std::string lan_address_;
     std::deque<Job> urgent_;
     std::deque<Job> queued_;

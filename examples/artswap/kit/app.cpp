@@ -5,7 +5,7 @@
  * kit's Aurora Shelf design: the focused title's background fills the
  * screen, its name and what can be changed on the left, its icon large on
  * the right, every title's icon on a shelf below. The picker keeps that frame
- * and swaps the shelf for a grid of SteamGridDB's art, with a preview of
+ * and swaps the shelf for a grid of pictures, with a preview of
  * exactly what would be written (the helper makes it) beside the current
  * art. Changing anything goes through a confirmation that says the original
  * is kept, so Restore can put it back.
@@ -65,17 +65,16 @@ struct Kind
 {
     const char *tab;   // shown
     const char *slot;  // the art it changes: icon, pic or logo
-    const char *kind;  // the helper's LIST kind
     float cell_w, cell_h;
     bool fit;          // the framing it starts with
 };
 
-// the picker's tabs: SteamGridDB's square grids for the tile, its heroes (made for backgrounds) for pic0, its
-// logos (transparent, mostly white lettering) for the game's page, where its name would show
+// the picker's tabs: pictures for the tile, for pic0, and for the game's page, where its name would show (a
+// transparent PNG, mostly white lettering)
 const Kind kKinds[] = {
-    {"Icons", "icon", "square", 200, 200, false},
-    {"Backgrounds", "pic", "heroes", 520, 168, false},
-    {"Logos", "logo", "logos", 344, 150, false},
+    {"Icons", "icon", 200, 200, false},
+    {"Backgrounds", "pic", 520, 168, false},
+    {"Logos", "logo", 344, 150, false},
 };
 
 const Kind &kind_for(const std::vector<int> &kinds, int tab)
@@ -370,7 +369,7 @@ void App::load_titles(bool rescan)
         titles_.clear();
         for (const auto &row : reply.rows())
         {
-            if (row.size() < 9 || row[0] != "A")
+            if (row.size() < 7 || row[0] != "A")
                 continue;
             auto title = std::make_unique<Title>();
             title->id = row[1];
@@ -379,20 +378,18 @@ void App::load_titles(bool rescan)
             title->icon_desc = row[4];
             title->pic_desc = row[5];
             title->kept = row[6] == "1";
-            title->name_kept = row.size() > 9 && row[9] == "1";
-            title->refresh = row.size() <= 10 || row[10] == "1";
-            if (row.size() > 13)
+            title->name_kept = row.size() > 7 && row[7] == "1";
+            title->refresh = row.size() <= 8 || row[8] == "1";
+            if (row.size() > 11)
             {
-                title->store_concept = std::strtol(row[11].c_str(), nullptr, 10);
-                title->logo = row[12];
-                title->listed = row[13] == "1";
+                title->store_concept = std::strtol(row[9].c_str(), nullptr, 10);
+                title->logo = row[10];
+                title->listed = row[11] == "1";
             }
-            title->added = row.size() > 14 && row[14] == "1";
-            title->recent = row.size() > 15 ? std::strtol(row[15].c_str(), nullptr, 10) : 0;
-            title->music = row.size() > 16 ? row[16] : "-";
-            title->music_added = row.size() > 17 && row[17] == "1";
-            title->sgdb_id = std::strtol(row[7].c_str(), nullptr, 10);
-            title->sgdb_name = row[8];
+            title->added = row.size() > 12 && row[12] == "1";
+            title->recent = row.size() > 13 ? std::strtol(row[13].c_str(), nullptr, 10) : 0;
+            title->music = row.size() > 14 ? row[14] : "-";
+            title->music_added = row.size() > 15 && row[15] == "1";
             // keep the pictures already loaded, unless this is a fresh look
             for (auto &before : old)
                 if (before && before->id == title->id && !rescan)
@@ -458,11 +455,6 @@ void App::load_titles(bool rescan)
         grow_.assign(titles_.size(), tween::Spring{});
         if (!grow_.empty())
             grow_[static_cast<std::size_t>(focus_)].snap(1.0f);
-        if (key_state_ == "none" && !key_explained_ && sheet_ == Sheet::none && screen_ == Screen::library)
-        {
-            key_explained_ = true;
-            open_connect("");
-        }
     }, true);
 }
 
@@ -595,7 +587,6 @@ void App::open_picker(int title, const std::string &slot)
     slot_.clear();
     screen_ = Screen::picker;
     age_ = 0.0f;
-    list_error_.clear();
     tab_ = 0;
     const std::vector<int> kinds = tab_kinds();
     for (int i = 0; i < static_cast<int>(kinds.size()); ++i)
@@ -638,7 +629,6 @@ void App::close_picker()
     generation_++;
     // the dropped requests never answer, so nothing is still on its way
     listing_ = false;
-    matching_ = false;
     for (auto &art : arts_)
         forget(art->texture);
     arts_.clear();
@@ -657,7 +647,6 @@ void App::set_tab(int tab)
     generation_++;
     // the dropped requests never answer, so nothing is still on its way
     listing_ = false;
-    matching_ = false;
     for (auto &art : arts_)
         forget(art->texture);
     arts_.clear();
@@ -671,158 +660,64 @@ void App::set_tab(int tab)
     }
     art_focus_ = 0;
     art_moved_ = false;
-    page_ = 0;
-    total_ = 0;
-    hidden_ = 0;
     store_arts_ = 0;
     mine_arts_ = 0;
     store_asked_ = false;
-    list_error_.clear();
     grid_scroll_.position.snap(0.0f);
     reset_framing();
     preview_due_ = -1.0f;
     preview_serial_++;
     preview_loading_ = false;
     cell_ring_.snap(cell_rect(0));
-    load_mine(); // the person's own pictures, then SteamGridDB's (match_and_list)
+    load_mine(); // the person's own pictures, then a store game's own logo (load_store_logo)
 }
 
-void App::match_and_list()
-{
-    if (picker_title_ < 0)
-        return;
-    Title &title = *titles_[static_cast<std::size_t>(picker_title_)];
-    if (title.sgdb_id > 0)
-    {
-        load_page();
-        return;
-    }
-    // not matched yet: SteamGridDB's closest name, kept for next time
-    matching_ = true;
-    const int gen = generation_;
-    const std::string id = title.id, name = title.name;
-    helper_.ask({"SEARCH", name}, [this, gen, id, name](Reply &reply) {
-        if (gen != generation_)
-            return;
-        matching_ = false;
-        if (!reply.ok)
-        {
-            list_error_ = reply.error;
-            return;
-        }
-        for (const auto &row : reply.rows())
-            if (row.size() >= 3 && row[0] == "G")
-            {
-                for (auto &t : titles_)
-                    if (t->id == id)
-                    {
-                        t->sgdb_id = std::strtol(row[1].c_str(), nullptr, 10);
-                        t->sgdb_name = row[2];
-                    }
-                helper_.ask({"MATCH", id, row[1], row[2]}, nullptr);
-                load_page();
-                return;
-            }
-        list_error_ = "SteamGridDB has no game called \"" + name +
-                      "\". Choose Another game to look for it under another name.";
-        // a store game's own logo can show all the same
-        for (auto &t : titles_)
-            if (t->id == id && slot_ == "logo" && t->store_concept > 0 && store_logos_)
-                load_page();
-    }, true, gen);
-}
-
-void App::load_page()
+// On a store game's Logos tab, its own logo from PlayStation Store after the person's pictures, when they have
+// turned that on in Settings
+void App::load_store_logo()
 {
     if (picker_title_ < 0 || listing_)
         return;
     const Title &title = *titles_[static_cast<std::size_t>(picker_title_)];
-    listing_ = true;
-    const int gen = generation_, page = page_;
-    // a store game's own logo first, from PlayStation Store, when the person has turned that on
-    if (slot_ == "logo" && page == 0 && title.store_concept > 0 && store_logos_ && !store_asked_ && !store_unreachable_)
-    {
-        store_asked_ = true;
-        helper_.ask({"STORELOGO", title.id}, [this, gen](Reply &reply) {
-            if (gen != generation_)
-                return;
-            listing_ = false;
-            if (!reply.ok)
-            {
-                // once a run: a console that cannot reach the store will not reach it the next time either
-                store_unreachable_ = true;
-                toast("PlayStation Store's logo did not load", reply.error, true);
-            }
-            for (const auto &row : reply.rows())
-                if (row.size() >= 9 && row[0] == "I")
-                {
-                    auto art = std::make_unique<Art>();
-                    art->url = row[2];
-                    art->thumb = row[3];
-                    art->w = std::atoi(row[4].c_str());
-                    art->h = std::atoi(row[5].c_str());
-                    art->style = row[6];
-                    art->author = row[7];
-                    art->mime = row[8];
-                    art->store = true;
-                    arts_.push_back(std::move(art));
-                    store_arts_++;
-                }
-            if (store_arts_ > 0 && !art_moved_)
-            {
-                art_focus_ = mine_arts_;
-                preview_due_ = 0.0f;
-            }
-            request_thumbs();
-            if (!arts_.empty())
-                cell_ring_.snap(cell_rect(art_focus_));
-            if (titles_[static_cast<std::size_t>(picker_title_)]->sgdb_id > 0)
-                load_page();
-        }, true, gen);
+    if (slot_ != "logo" || title.store_concept <= 0 || !store_logos_ || store_asked_ || store_unreachable_)
         return;
-    }
-    helper_.ask({"LIST", std::to_string(title.sgdb_id), kind_for(tab_kinds(), tab_).kind, std::to_string(page)},
-                [this, gen](Reply &reply) {
-                    if (gen != generation_)
-                        return;
-                    listing_ = false;
-                    if (!reply.ok)
-                    {
-                        list_error_ = reply.error;
-                        return;
-                    }
-                    const bool first = static_cast<int>(arts_.size()) == mine_arts_ + store_arts_;
-                    for (const auto &row : reply.rows())
-                    {
-                        if (row.size() >= 4 && row[0] == "P")
-                            total_ = std::atoi(row[2].c_str());
-                        else if (row.size() >= 2 && row[0] == "H")
-                            hidden_ += std::atoi(row[1].c_str());
-                        else if (row.size() >= 9 && row[0] == "I")
-                        {
-                            auto art = std::make_unique<Art>();
-                            art->url = row[2];
-                            art->thumb = row[3];
-                            art->w = std::atoi(row[4].c_str());
-                            art->h = std::atoi(row[5].c_str());
-                            art->style = row[6];
-                            art->author = row[7];
-                            art->mime = row[8];
-                            arts_.push_back(std::move(art));
-                        }
-                    }
-                    page_++;
-                    // SteamGridDB's first takes the focus from the add cell, unless the person has moved
-                    if (first && !art_moved_ && static_cast<int>(arts_.size()) > mine_arts_)
-                        art_focus_ = mine_arts_;
-                    request_thumbs();
-                    if (first && !arts_.empty())
-                    {
-                        preview_due_ = 0.0f;
-                        cell_ring_.snap(cell_rect(art_focus_));
-                    }
-                },
-                true, gen);
+    listing_ = true;
+    store_asked_ = true;
+    const int gen = generation_;
+    helper_.ask({"STORELOGO", title.id}, [this, gen](Reply &reply) {
+        if (gen != generation_)
+            return;
+        listing_ = false;
+        if (!reply.ok)
+        {
+            // once a run: a console that cannot reach the store will not reach it the next time either
+            store_unreachable_ = true;
+            toast("PlayStation Store's logo did not load", reply.error, true);
+        }
+        for (const auto &row : reply.rows())
+            if (row.size() >= 9 && row[0] == "I")
+            {
+                auto art = std::make_unique<Art>();
+                art->url = row[2];
+                art->thumb = row[3];
+                art->w = std::atoi(row[4].c_str());
+                art->h = std::atoi(row[5].c_str());
+                art->style = row[6];
+                art->author = row[7];
+                art->mime = row[8];
+                art->store = true;
+                arts_.push_back(std::move(art));
+                store_arts_++;
+            }
+        if (store_arts_ > 0 && !art_moved_)
+        {
+            art_focus_ = mine_arts_;
+            preview_due_ = 0.0f;
+        }
+        request_thumbs();
+        if (!arts_.empty())
+            cell_ring_.snap(cell_rect(art_focus_));
+    }, true, gen);
 }
 
 void App::request_thumbs()
@@ -1682,7 +1577,7 @@ std::vector<App::MenuItem> App::menu_items() const
         {"Rename", rename ? "the name on the home screen" : "homebrew installed from a folder only", rename},
         {"Restore originals", restore ? "the art and name it came with" : "nothing changed", restore},
         {"Home screen", "Games or Media, hidden tiles, the order", true},
-        {"Settings", "SteamGridDB key, game list, store logos, log", true},
+        {"Settings", "game list, store logos, log", true},
         {"Close Art Swap", "", true},
     };
 }
@@ -1738,79 +1633,6 @@ void App::menu_select(ui::Feedback &feedback)
     }
 }
 
-void App::open_search(const std::string &term)
-{
-    sheet_ = Sheet::search;
-    sheet_focus_ = results_.empty() ? 0 : sheet_focus_;
-    search_term_ = term;
-    searching_ = true;
-    search_error_.clear();
-    results_.clear();
-    sheet_focus_ = 0;
-    sheet_focus_position_.snap(0.0f);
-    helper_.ask({"SEARCH", term}, [this, term](Reply &reply) {
-        if (term != search_term_)
-            return;
-        searching_ = false;
-        if (!reply.ok)
-        {
-            search_error_ = reply.error;
-            return;
-        }
-        for (const auto &row : reply.rows())
-            if (row.size() >= 5 && row[0] == "G")
-                results_.push_back(row);
-        if (results_.empty())
-            search_error_ = "Nothing on SteamGridDB is called \"" + term + "\"";
-        else
-            sheet_focus_ = 1;
-    }, true);
-}
-
-void App::choose_game(int row)
-{
-    if (row < 1 || row > static_cast<int>(results_.size()) || picker_title_ < 0)
-        return;
-    const auto &game = results_[static_cast<std::size_t>(row - 1)];
-    Title &title = *titles_[static_cast<std::size_t>(picker_title_)];
-    title.sgdb_id = std::strtol(game[1].c_str(), nullptr, 10);
-    title.sgdb_name = game[2];
-    helper_.ask({"MATCH", title.id, game[1], game[2]}, nullptr, true);
-    sheet_ = Sheet::none;
-    set_tab(tab_);
-}
-
-void App::type_search()
-{
-    const Title *title = picker_title_ >= 0 ? titles_[static_cast<std::size_t>(picker_title_)].get() : nullptr;
-    if (!open_keyboard("Search SteamGridDB", search_term_.empty() && title ? title->name : search_term_, 80,
-                         [this](bool ok, std::string text) {
-                             if (ok && !text.empty())
-                                 open_search(text);
-                         }))
-        toast("The keyboard did not open", "", true);
-}
-
-void App::type_key()
-{
-    if (!open_keyboard("SteamGridDB API key", "", 64, [this](bool ok, std::string text) {
-            if (!ok || text.empty())
-                return;
-            sheet_ = Sheet::working;
-            working_text_ = "Checking the key with SteamGridDB";
-            helper_.ask({"KEY", text}, [this](Reply &reply) {
-                sheet_ = Sheet::none;
-                if (!reply.ok)
-                {
-                    toast("The key was not taken", reply.error, true);
-                    return;
-                }
-                key_added("SteamGridDB accepted it.");
-            }, true);
-        }))
-        toast("The keyboard did not open", "", true);
-}
-
 // ---------------------------------------------------------------- update
 
 // The console's keyboard, with the pad kept from Art Swap while it is up and until every button the person
@@ -1845,11 +1667,6 @@ void App::update(const hui::InputFrame &pad, float dt, ui::Feedback &feedback)
         t.age += dt;
     toasts_.erase(std::remove_if(toasts_.begin(), toasts_.end(), [](const Toast &t) { return t.age > t.life; }),
                   toasts_.end());
-    if (key_state_.empty() && helper_.state() == Helper::State::ready)
-    {
-        key_state_ = helper_.key_source();
-        key_hint_ = helper_.key_hint();
-    }
     check_last_refresh();
     check_last_home();
     poll_refresh(dt);
@@ -1887,10 +1704,8 @@ void App::update(const hui::InputFrame &pad, float dt, ui::Feedback &feedback)
         update_settings(input, dt, feedback);
     else if (screen_ == Screen::home)
         update_home(input, dt, feedback);
-    else if (screen_ == Screen::music)
-        update_music(input, dt, feedback);
     else
-        update_connect(input, dt, feedback);
+        update_music(input, dt, feedback);
     // OPTIONS opens the menu, and closes it again
     if (menu_tap && screen_ == Screen::library && (sheet_ == Sheet::none || sheet_ == Sheet::menu))
     {
@@ -2106,22 +1921,6 @@ void App::update_picker(const hui::InputFrame &input, float dt, ui::Feedback &fe
             feedback.play(Cue::error, 1.0f, 0.0f, 0.5f);
         return;
     }
-    if (input.is_pressed(Action::west))
-    {
-        // with no key, □ adds one; the picker opens again after it
-        if (key_state_ != "user")
-        {
-            feedback.play(Cue::open);
-            const std::string slot = slot_;
-            close_picker();
-            open_connect(slot);
-            return;
-        }
-        feedback.play(Cue::modal_open);
-        const Title &title = *titles_[static_cast<std::size_t>(picker_title_)];
-        open_search(title.name);
-        return;
-    }
     if (count > 0)
     {
         int next = art_focus_;
@@ -2159,9 +1958,6 @@ void App::update_picker(const hui::InputFrame &input, float dt, ui::Feedback &fe
             else if (!input.nav_repeat)
                 feedback.play(Cue::error, 1.0f, 0.0f, 0.5f);
         }
-        // more from SteamGridDB when the last row is reached
-        if (art_focus_ / cols >= (count - 1) / cols && count - store_arts_ - mine_arts_ < total_ && !listing_)
-            load_page();
         const Art *art = focused_art();
         // the add cell: the phone page's QR code
         if (art && art->add)
@@ -2202,11 +1998,6 @@ void App::update_picker(const hui::InputFrame &input, float dt, ui::Feedback &fe
                 request_preview();
             }
         }
-    }
-    else if (input.is_pressed(Action::confirm) && !list_error_.empty())
-    {
-        feedback.play(Cue::select);
-        set_tab(tab_);
     }
 }
 
@@ -2325,34 +2116,6 @@ void App::update_sheet(const hui::InputFrame &input, ui::Feedback &feedback)
     default:
         break;
     }
-    // the search results
-    const int rows = 1 + static_cast<int>(results_.size());
-    if (input.nav == Direction::up || input.nav == Direction::down)
-    {
-        const int next = std::clamp(sheet_focus_ + (input.nav == Direction::down ? 1 : -1), 0, rows - 1);
-        if (next != sheet_focus_)
-        {
-            sheet_focus_ = next;
-            feedback.play(Cue::focus, 1.0f, 0.2f);
-        }
-        else if (!input.nav_repeat)
-            feedback.play(Cue::error, 1.0f, 0.0f, 0.5f);
-    }
-    if (input.is_pressed(Action::back))
-    {
-        feedback.play(Cue::modal_close);
-        sheet_ = Sheet::none;
-        pending_slot_.clear();
-        return;
-    }
-    if (input.is_pressed(Action::confirm))
-    {
-        feedback.play(Cue::select);
-        if (sheet_focus_ == 0)
-            type_search();
-        else
-            choose_game(sheet_focus_);
-    }
 }
 
 // ---------------------------------------------------------------- layout
@@ -2406,8 +2169,6 @@ void App::draw(hui::app::Frame &frame) const
         draw_settings(list);
     else if (screen_ == Screen::home)
         draw_home(list);
-    else if (screen_ == Screen::connect)
-        draw_connect(list);
     else
     {
         draw_top_bar(list);
@@ -2439,7 +2200,7 @@ void App::draw(hui::app::Frame &frame) const
 
 void App::draw_backdrop(hui::app::Frame &frame) const
 {
-    if (screen_ == Screen::settings || screen_ == Screen::connect)
+    if (screen_ == Screen::settings)
     {
         // a quiet dot field in the app's own indigo, whatever game is in focus
         frame.backdrop.mode = gfx::BackdropMode::dots;
@@ -2480,7 +2241,7 @@ void App::draw_starting(gfx::DrawList &list) const
     const float in = tween::stagger(age_, 0, 0.05f, 0.6f);
     list.push_opacity(in);
     ui::text(list, fonts_.display, "Art Swap", 960, 470, 104, kWhite, gfx::Align::center);
-    ui::text(list, fonts_.semibold, "HOME-SCREEN ART FROM STEAMGRIDDB", 960, 530, 20, kWhite.with_alpha(0.6f),
+    ui::text(list, fonts_.semibold, "HOME-SCREEN ART OF YOUR OWN", 960, 530, 20, kWhite.with_alpha(0.6f),
              gfx::Align::center, 5.0f);
     const bool failed = helper_.state() == Helper::State::failed;
     if (!failed)
@@ -2511,13 +2272,8 @@ void App::draw_top_bar(gfx::DrawList &list) const
         right = "No network for the helper";
         dot = kRed;
     }
-    else if (key_state_ == "none")
-    {
-        right = "No SteamGridDB key: OPTIONS, then Settings, to add yours";
-        dot = kAmber;
-    }
     else
-        right = std::string("SteamGridDB") + (key_state_ == "user" ? " \xC2\xB7 your key" : "");
+        right = "Your own pictures";
     const float tw = ui::text(list, fonts_.regular, right, 1824, 92, 24, kWhite.with_alpha(0.75f), gfx::Align::right);
     list.circle(1824 - tw - 20, 84, 7, dot);
     // changes the home screen does not show yet: R2 applies them
@@ -2593,10 +2349,6 @@ void App::draw_library(gfx::DrawList &list) const
                            title->accent.with_alpha(0.7f));
         ui::text(list, fonts_.semibold, chip, x + 22, y, 21, kWhite);
         y += 52;
-    }
-    if (!title->sgdb_name.empty())
-    {
-        ui::text(list, fonts_.regular, "SteamGridDB: " + title->sgdb_name, x, y, 22, kWhite.with_alpha(0.55f));
     }
 
     // the actions, as the console draws its Play button
@@ -2740,23 +2492,6 @@ void App::draw_picker(gfx::DrawList &list) const
     ui::text(list, fonts_.semibold, icon ? "CHANGE THE ICON" : logo ? "CHANGE THE LOGO" : "CHANGE THE BACKGROUND",
              kMargin, 168, 20, title.accent, gfx::Align::left, 4.0f);
     ui::text(list, fonts_.display, fonts_.display.font->fit(title.name, 60, 1100), kMargin - 3, 234, 60, kWhite);
-    std::string game;
-    const bool keyed = key_state_ == "user";
-    if (!keyed)
-        game = "Your own pictures: no SteamGridDB key";
-    else if (matching_)
-        game = "Finding " + title.name + " on SteamGridDB\xE2\x80\xA6";
-    else if (!title.sgdb_name.empty())
-        game = "SteamGridDB: " + title.sgdb_name;
-    const float gw = ui::text(list, fonts_.regular, game, kMargin, 276, 23, kWhite.with_alpha(0.7f));
-    if (!game.empty())
-    {
-        const ui::GlyphStyle dark = ui::GlyphStyle::dark();
-        ui::draw_button(list, fonts_, dark, ui::Button::square, kMargin + gw + 22, 268, 28);
-        ui::text(list, fonts_.regular, keyed ? "Another game" : "Add your key", kMargin + gw + 60, 276, 21,
-                 kWhite.with_alpha(0.55f));
-    }
-
     // the tabs
     const ui::GlyphStyle dark = ui::GlyphStyle::dark();
     const auto names = tabs();
@@ -2827,42 +2562,16 @@ void App::draw_picker(gfx::DrawList &list) const
                      1.0f);
         }
     }
-    // the grid's own messages, under the person's own pictures: about SteamGridDB's
-    if (static_cast<int>(arts_.size()) <= mine_arts_ + store_arts_ && !mine_loading_)
+    // a store game's logo on its way, under the person's own pictures
+    if (listing_ && static_cast<int>(arts_.size()) <= mine_arts_ + store_arts_ && !mine_loading_)
     {
-        const float my = arts_.empty() ? kGridTop + 60
-                                       : cell_rect(static_cast<int>(arts_.size()) - 1).y + cell_size().h + 70;
-        if (key_state_ != "user")
-        {
-            const float py = ui::paragraph(list, fonts_.regular,
-                                           "SteamGridDB has art for most games, made by its community. Add your own "
-                                           "free key to see it here.",
-                                           kGridX, my, 27, 1050, 40, kWhite.with_alpha(0.85f), 3);
-            ui::draw_button(list, fonts_, ui::GlyphStyle::dark(), ui::Button::square, kGridX, py + 22, 30);
-            ui::text(list, fonts_.regular, "Add your key", kGridX + 42, py + 30, 22, kWhite.with_alpha(0.7f));
-        }
-        else if (listing_ || matching_)
-        {
-            draw_spinner(list, kGridX + 40, my - 10, 22);
-            ui::text(list, fonts_.regular, "Asking SteamGridDB\xE2\x80\xA6", kGridX + 84, my, 26,
-                     kWhite.with_alpha(0.8f));
-        }
-        else if (!list_error_.empty())
-            ui::paragraph(list, fonts_.regular, list_error_, kGridX, my, 27, 1050, 40, kWhite, 4);
-        else
-        {
-            const std::string what = icon ? "icons" : logo ? "logos" : "backgrounds";
-            ui::paragraph(list, fonts_.regular,
-                          "SteamGridDB has no " + what + " for this game yet. If it is listed under another "
-                              "name, choose Another game.",
-                          kGridX, my, 27, 1050, 40, kWhite.with_alpha(0.85f), 4);
-        }
+        const float my = arts_.empty() ? kGridTop + 60 : cell_rect(static_cast<int>(arts_.size()) - 1).y + cell_size().h + 70;
+        draw_spinner(list, kGridX + 40, my - 10, 22);
+        ui::text(list, fonts_.regular, "Asking PlayStation Store\xE2\x80\xA6", kGridX + 84, my, 26, kWhite.with_alpha(0.8f));
     }
     if (!arts_.empty())
         list.bordered_rect(cell_ring_.value().inset(-5), 18, Color::rgb(0x000000, 0.0f), 4, kWhite);
     list.pop_clip();
-    if (listing_ && static_cast<int>(arts_.size()) > mine_arts_ + store_arts_)
-        draw_spinner(list, kPanelX - 70, kGridBottom - 10, 16);
 
     // ---- the preview: what would be written, beside what is there ----
     const Art *art = focused_art();
@@ -3005,7 +2714,7 @@ void App::draw_new_art(gfx::DrawList &list, const Rect &r, float radius) const
 void App::draw_sheet(gfx::DrawList &list, std::uint32_t glass) const
 {
     const float t = sheet_open_.value;
-    const bool tall = sheet_ == Sheet::search || sheet_ == Sheet::log || sheet_ == Sheet::apply ||
+    const bool tall = sheet_ == Sheet::log || sheet_ == Sheet::apply ||
                       sheet_ == Sheet::music_phone || sheet_ == Sheet::pictures_phone ||
                       (sheet_ == Sheet::refresh && (refresh_ == Refresh::ready || refresh_ == Refresh::starting));
     const float h = tall ? 760.0f : sheet_ == Sheet::menu ? 660.0f : sheet_ == Sheet::place ? 600.0f : 470.0f;
@@ -3271,29 +2980,6 @@ void App::draw_sheet(gfx::DrawList &list, std::uint32_t glass) const
             need("ShadowMountPlus 1.7 or later, running", true, "ShadowMountPlus " + smp_version_);
         break;
     }
-    case Sheet::search:
-    {
-        heading("WHICH GAME IS IT?", name);
-        std::vector<std::pair<std::string, std::string>> items;
-        items.emplace_back("Search for another name\xE2\x80\xA6", "keyboard");
-        for (const auto &row : results_)
-            items.emplace_back(row[2], row[3] != "0" ? row[3] : std::string());
-        // a window of rows around the focus
-        const int window = 8;
-        const int first = std::clamp(sheet_focus_ - window / 2, 0, std::max(0, static_cast<int>(items.size()) - window));
-        std::vector<std::pair<std::string, std::string>> shown(
-            items.begin() + first, items.begin() + std::min(static_cast<int>(items.size()), first + window));
-        rows(shown, sheet_focus_ - first, sheet_focus_position_.value - static_cast<float>(first));
-        if (searching_)
-        {
-            draw_spinner(list, x + 22, y + 40, 18);
-            ui::text(list, fonts_.regular, "Searching for \"" + search_term_ + "\"\xE2\x80\xA6",
-                     x + 60, y + 50, 24, kWhite.with_alpha(0.8f));
-        }
-        else if (!search_error_.empty())
-            ui::text(list, fonts_.regular, search_error_, x, y + 50, 24, kAmber);
-        break;
-    }
     case Sheet::music_phone:
     case Sheet::music_confirm:
         draw_music_sheet(list, panel, x, y);
@@ -3391,8 +3077,6 @@ void App::draw_hints(gfx::DrawList &list) const
         hints = {{ui::Button::cross, "Restore"}, {ui::Button::circle, "Cancel"}};
     else if (sheet_ == Sheet::picture_delete)
         hints = {{ui::Button::cross, "Delete"}, {ui::Button::circle, "Cancel"}};
-    else if (sheet_ == Sheet::search)
-        hints = {{ui::Button::cross, "Choose"}, {ui::Button::circle, "Back"}};
     else if (sheet_ == Sheet::log)
         hints = {{ui::Button::circle, "Back"}};
     else if (sheet_ == Sheet::menu)
@@ -3475,9 +3159,6 @@ void App::draw_hints(gfx::DrawList &list) const
         else
             hints = {{ui::Button::dpad, "Choose"}, {ui::Button::cross, "Open"}, {ui::Button::circle, "Close"}};
     }
-    else if (screen_ == Screen::connect)
-        hints = {{ui::Button::dpad, "Choose"}, {ui::Button::cross, "Select"},
-                 {ui::Button::circle, connect_back_ == Screen::settings ? "Back" : "Not now"}};
     else if (screen_ == Screen::library)
     {
         const Title *title = focused_title();
@@ -3509,7 +3190,6 @@ void App::draw_hints(gfx::DrawList &list) const
             if (art->mine)
                 hints.push_back({ui::Button::options, "Delete"});
         }
-        hints.push_back({ui::Button::square, key_state_ == "user" ? "Another game" : "Add your key"});
         hints.push_back({ui::Button::circle, "Back"});
     }
     if (hints.empty())

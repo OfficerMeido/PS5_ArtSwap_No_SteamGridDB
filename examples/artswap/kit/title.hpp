@@ -14,7 +14,7 @@ namespace artswap
 
 struct App::Title
 {
-    std::string id, name, kind, icon_desc, pic_desc, sgdb_name;
+    std::string id, name, kind, icon_desc, pic_desc;
     bool kept = false;      // an original of its art is kept
     bool name_kept = false; // its original name is kept (renamed)
     bool refresh = true;    // ShadowMountPlus can install it again (R2); otherwise only a restart shows new art
@@ -30,7 +30,6 @@ struct App::Title
     {
         return !(pic_desc == "-" || pic_desc.empty());
     }
-    long sgdb_id = 0;
     // changed by Art Swap: art (originals kept), a name or a logo, so Restore has something to put back
     bool changed() const
     {
@@ -50,7 +49,7 @@ struct App::Title
                     accent = hui::gfx::Color::rgb(0x9fd8ff);
 };
 
-// A picture in the picker: SteamGridDB's, the store's, or the person's own (url "mine:<name>")
+// A picture in the picker: the store's, or the person's own (url "mine:<name>")
 struct App::Art
 {
     std::string url, thumb, style, author, mime;
