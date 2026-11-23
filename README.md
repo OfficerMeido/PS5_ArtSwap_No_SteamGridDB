@@ -1,7 +1,4 @@
 # Art Swap
-
-[![stars](https://img.shields.io/github/stars/griches/PS5_ArtSwap?style=flat)](https://github.com/griches/PS5_ArtSwap/stargazers)
-[![release](https://img.shields.io/github/v/release/griches/PS5_ArtSwap)](https://github.com/griches/PS5_ArtSwap/releases/latest)
 [![licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
 
 **Change the icon, background, logo and music of any title on your PS5's home
