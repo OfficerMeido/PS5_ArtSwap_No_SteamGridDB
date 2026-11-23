@@ -5,11 +5,11 @@
 [![licence](https://img.shields.io/badge/licence-GPL--3.0--or--later-blue)](LICENSE)
 
 **Change the icon, background, logo and music of any title on your PS5's home
-screen, with art from [SteamGridDB](https://www.steamgriddb.com), pictures and
-songs of your own, and arrange the home screen itself.**
+screen, with pictures and songs of your own, and arrange the home
+screen itself.**
 
 Art Swap lists every title on the console that has home-screen art, finds each
-one on SteamGridDB, shows you that game's art, and writes the one you pick over
+one, shows you your own pictures (and a store game's own logo), and writes the one you pick over
 the title's own `icon0` or `pic0`/`pic1`. The original is kept beside it as an
 `.old` file, so Restore can put it back. **Apply changes** (R2) then restarts
 the home screen, and every change shows at once, whatever installed the game:
@@ -28,12 +28,10 @@ Title `PPSA99318`, version 1.4.0. Tested on a PS5 with firmware 13.60.
   the `homebrew` folders on USB and extended storage. Each one shows its art as
   it is now and what form that art takes (for example "Icon PNG 512×512, 2 files ·
   Background DDS BC7 3840×2160, 4 files").
-- **Finds the game on SteamGridDB** by its name, and remembers the match. If the
-  match is wrong, □ in the picker lists other matches or searches for any name you type.
-- **Icons** come from SteamGridDB's square grids, and **Backgrounds** from its
-  heroes (art made for backgrounds). A PS5 background is 3840×2160, so the
-  3840×1240 heroes are listed first and tagged 4K: a 1920×620 one is enlarged
-  about 3.5 times to fill it, and the frame page says so.
+- **Icons, Backgrounds and Logos** come from pictures of your own (sent from a phone or
+  computer, or copied over FTP). A PS5 background is 3840×2160: a 3840×1240
+  picture is tagged 4K, and a smaller one is enlarged to fill it, which the frame
+  page says.
 - **Adds a background** to homebrew that has none (△, "Add background"), when
   ShadowMountPlus installed it from a folder: Art Swap writes `pic0.dds`
   (3840×2160 BC7, as the console writes its own) into the game's `sce_sys`,
@@ -65,7 +63,7 @@ Title `PPSA99318`, version 1.4.0. Tested on a PS5 with firmware 13.60.
   on the home screen yet.
 - **Logos** (□): a game's page on the home screen shows its logo where it has
   one and its name in plain text where it has not, as with homebrew and
-  installed backups. Art Swap puts a logo from SteamGridDB there, and it shows
+  installed backups. Art Swap puts a logo of yours there, and it shows
   at once: see [Logos](#logos). Store games can also be offered their own
   logo from PlayStation Store, when you turn that on in Settings.
 - **Music** (OPTIONS, Music): the tune a tile plays while it is selected. Send
@@ -74,8 +72,7 @@ Title `PPSA99318`, version 1.4.0. Tested on a PS5 with firmware 13.60.
   see [Music](#music).
 - **Your own pictures**: icons, backgrounds and logos sent from a phone or a
   computer (the first cell of the picker shows a QR code), or copied into
-  `/data/artswap/pictures`, come first in every tab, for every game, and need
-  no SteamGridDB key: see [Your own pictures](#your-own-pictures).
+  `/data/artswap/pictures`, fill every tab, for every game: see [Your own pictures](#your-own-pictures).
 - **Arranges the home screen** (OPTIONS, Home screen): any tile on the Games
   home or the Media home, or hidden from both, and the Games row in an order
   of your own, locked if you like, so playing a game no longer moves it first:
@@ -96,7 +93,7 @@ through that loader.
 2. Copy the `PPSA99318` folder inside it to `/data/homebrew/` (FTP is fine).
 3. ShadowMountPlus registers it and Art Swap appears on the home screen.
 4. Start it. The first screen says "Starting the helper" for a moment.
-5. Add your SteamGridDB API key when it asks (see [below](#the-steamgriddb-api-key)).
+5. Send some pictures of your own from the picker (see [Your own pictures](#your-own-pictures)).
 
 ## Using it
 
@@ -120,7 +117,6 @@ L1 R1 L2 R2, OPTIONS, then ○.
 | | right stick | slide the part kept, when Fill cuts the picture |
 | | ✕ | use it (asks first); on the first cell, send pictures of your own from a phone or computer (a QR code) |
 | | △ | the frame page: which part of the picture is kept (not for a logo, which is used whole) |
-| | □ | another game, or search by name with the keyboard (with no SteamGridDB key: add one) |
 | | OPTIONS | on a picture of your own: delete it from the console (asks first) |
 | | ○ | back to the games |
 | Frame | left stick, D-pad | move the part kept |
@@ -241,8 +237,8 @@ the picture its database names for the title (`logoImageInfo` in
 `/system_data/priv/mms/app.db`). Store games get theirs from PlayStation
 Network, which a jailbroken console does not reach, and homebrew has none.
 
-□, or the Logos tab of the picker, lists SteamGridDB's logos for the game
-(transparent PNGs, mostly white lettering), each on a dark plate, with the
+The Logos tab of the picker lists your own logos (transparent PNGs, mostly
+white lettering), each on a dark plate, with the
 page as it will look beside the logo there now. ✕ puts it on:
 
 1. The helper writes the PNG as `logo.png` beside the title's art in
@@ -276,9 +272,7 @@ with no account, key, cookie or anything that says Art Swap or PS5, but Sony
 still sees the console's address and which game, so it is your choice. Each
 game is asked about once; the answer is kept in `/data/artswap/store/`. Most
 jailbroken consoles are kept from Sony's servers, to stop updates: on those
-the store cannot be reached, the Logos tab says so once a run, and
-SteamGridDB's logos show as before (it has the official logo of most store
-games too). Settings says this under the switch.
+the store cannot be reached and the Logos tab says so once a run. Settings says this under the switch.
 
 ## Music
 
@@ -320,10 +314,8 @@ iPhone) is turned into a PNG on the phone first. Copying files into the folder
 over FTP works too.
 
 They come first in the Icons, Backgrounds and Logos tabs, tagged YOURS, newest
-first, for every game, and go through the same frame page and preview as
-SteamGridDB's art. A logo wants a PNG with a see-through background: the page
-says when a picture has none. Without a SteamGridDB key the picker opens all
-the same, with your own pictures, and □ adds a key. Use pictures that are
+first, for every game, and go through the frame page and preview. A logo wants a PNG with a see-through background: the page
+says when a picture has none. Use pictures that are
 yours to use.
 
 To delete one, choose it in the picker and press OPTIONS: it leaves
@@ -356,30 +348,6 @@ Home layout found which fields the home screen reads: each tile's
 `dispLocation` (Games or Media) and `visible`, the system tiles' places in the
 `MyHome` group, and the dates and counters the Games row is sorted by.
 
-## The SteamGridDB API key
-
-SteamGridDB's API needs a key, and each person registers their own: it is free,
-and SteamGridDB's terms do not cover sharing one. No key is built into Art Swap.
-
-When Art Swap has no key it says so: on the first start, in the picker (which
-still has your own pictures; □ there adds a key), and at the top of the
-screen. It explains what the key is and how
-to get one (steamgriddb.com, sign in, Preferences, API), and offers two ways to
-add it:
-
-- **From your phone**: the TV shows a QR code, the console's address and a
-  four-digit code. The phone opens a small page served by the helper on port
-  9118, takes the key, checks it with SteamGridDB and saves it; the TV notices
-  and carries on. The page exists only while that screen is open (ten minutes
-  at most), needs the code, and closes after ten wrong codes.
-- **With the console's keyboard**.
-
-Settings (OPTIONS, then Settings) shows whether a key is in, with its last four characters,
-and can add, replace or remove it, refresh the game list, or show the helper's
-log. The key is kept in `/data/artswap/apikey.txt`, which can also be copied
-over FTP. Without a key, Art Swap still lists your games and restores original
-art.
-
 ## How it works
 
 A title runs in a sandbox and sees only its own folder, so it cannot read or
@@ -388,7 +356,7 @@ write `/user/appmeta`. Art Swap is therefore two programs:
 ```text
   Art Swap (the title, PPSA99318)           artswapd (the helper payload)
   the screens, drawn with the UI kit  <-->  reads and writes the art, talks to
-  helper_client: 4 connections,      TCP    SteamGridDB, makes the pictures
+  helper_client: 4 connections,      TCP    makes the pictures
   answers on the drawing thread   127.0.0.1:9117
           |
           '-- at start, if no helper answers: artswapd.elf --> ELF loader (127.0.0.1:9021)
@@ -408,13 +376,11 @@ On the console the helper keeps its files in `/data/artswap/`:
 | `helper.log` | what the helper did, each start (also in Settings, "Helper log") |
 | `scan.txt` | every title found, and each art file with its format and size |
 | `appmeta-files.txt` | every file in each title's `/user/appmeta` folder |
-| `matches.tsv` | the SteamGridDB game chosen for each title |
 | `pending.txt` | the titles changed since the home screen last restarted |
 | `home.txt` | how the last Apply changes ended |
 | `refresh.txt` | how the last install again ended |
 | `saves/` | what each install again copied aside (see above) |
 | `download-aside.txt` | a game whose download data is aside during an install, until it is back |
-| `apikey.txt` | your SteamGridDB API key |
 | `cache/` | downloaded pictures (trimmed to 192 MB when over 256 MB) |
 | `logos/` | the logo Art Swap put on each title's page (`<id>.png`), and what it replaced (`<id>.orig`) |
 | `added.txt` | the background and music files Art Swap added to titles that had none |
@@ -434,15 +400,14 @@ copy says which titles the home screen lists and which are store games.
 On a PS5 with firmware 13.60, ShadowMountPlus 1.7beta3: the title reaches the
 helper on 127.0.0.1 and starts it through the ELF loader; the scan (20 titles
 in 40-240 ms; `/user/appmeta/<id>/` holds `icon0.png`, `pic0.dds`, `pic1.dds`,
-`param.json` for a homebrew title); HTTPS to SteamGridDB's API and CDN
-(helper/tests/nettest.c); the key page from another machine on the network;
+`param.json` for a homebrew title); HTTPS from the helper
+(helper/tests/nettest.c); the phone page from another machine on the network;
 changing and restoring icons and backgrounds; the install again that 1.3.0's
 renames used (new art on the tile within seconds, the game's saves identical
 afterwards, file for file); and, with ShadowMountPlus 1.7beta7, Apply changes:
 new and restored art shown for a folder game, a disk image game (`.ffpfsc`)
 and a package game, the home screen back within about three seconds of Art
-Swap closing, and a game open in the background carrying on. Logos: one from
-SteamGridDB on a homebrew game's page at once, with no restart; a store
+Swap closing, and a game open in the background carrying on. Logos: one of the person's own on a homebrew game's page at once, with no restart; a store
 logo on a disk image game kept through a console restart; and a logo put back
 17 seconds into a rename's install, when the game's entry came back. The
 PlayStation Store lookup was tested from a Mac only. A background added to a
@@ -501,16 +466,13 @@ the UI kit's fork), with this folder mounted at the same path.
 ps5/tools/vm.sh build                  # dist/PPSA99318/ with eboot.bin and artswapd.elf
 helper/tools/build.sh                  # the helper alone: build/helper/artswapd.elf
 helper/tools/build.sh host             # the helper for this Mac (libcurl)
-python3 helper/tests/test_helper.py    # the helper against a made-up console and SteamGridDB, the key page too
+python3 helper/tests/test_helper.py    # the helper against a made-up console, the phone page too
 python3 helper/tests/test_at9.py       # the C ATRAC9 encoder against ps5-at9-converter (beside this folder)
 tools/preview/run.sh                   # the screens with the real helper, drawn in the VM: build/preview/*.png
-NOKEY=1 tools/preview/run.sh FILE      # ... as someone who has not added a key yet
 ```
 
 The preview's tour is a script of presses (`tools/preview/preview_main.cpp`
-has the default; `tools/preview/run.sh FILE` runs another). Put `SGDB_KEY=...`
-in `.env` first: the tests and the preview talk to SteamGridDB, and put that key
-into their made-up console's `apikey.txt`. It never goes into a build.
+has the default; `tools/preview/run.sh FILE` runs another). The Store logo part of the tests needs network access.
 
 The title is made from the [PS5 Vulkan Template](https://github.com/mihawk-99/PS5_VulkanTemplate)
 at `b577e950`, with its UI module. Art Swap's code is in `examples/artswap/kit/`
@@ -538,9 +500,9 @@ at `b577e950`, with its UI module. Art Swap's code is in `examples/artswap/kit/`
   [minimp3](https://github.com/lieff/minimp3) (CC0).
 - The QR code is drawn with [Nayuki's QR Code generator](https://github.com/nayuki/QR-Code-generator)
   (MIT), in `examples/artswap/kit/qrcodegen.*`.
-- **The art Art Swap offers** is SteamGridDB's, made and uploaded by its
-  community; each picture shows its author. Art Swap is not affiliated with
-  SteamGridDB, Valve or Sony.
+- **The art** is yours: use pictures that are yours to use. Store logos come
+  from Sony's public catalog when you turn that on. Art Swap is not affiliated
+  with Sony.
 - The way to set a logo (the PNG beside the art, `logoImageInfo` in `app.db`)
   was found by ensamvarg360's [Spela](https://github.com/ensamvarg360/spela)
   (GPL-3.0).
